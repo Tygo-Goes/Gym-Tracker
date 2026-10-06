@@ -132,8 +132,8 @@ function card(nm){const x=K(nm),h=sets(x),rm=S.e.filter(e=>e.x==x&&e.rm).sort((a
  if(l){last=`Laatst: ${fmt(l.d)} · `+(plank?l.t:`${l.kg} kg × ${l.r}`);
   if(!plank&&p){const up=l.kg>p.kg||(l.kg==p.kg&&l.r>p.r);if(up)last+=` <span class="up">▲</span>`}}
  let est="",sug="";
- if(!plank){const real=Math.max(0,...S.e.filter(e=>e.x==x&&e.rm).map(e=>e.kg)),E=e=>e.r==1?e.kg:e.r<=10?e.kg*(1+e.r/30):0,m=real||Math.max(0,...S.e.filter(e=>e.x==x&&!e.rm&&e.kg>0).map(E));
-  if(m>0)est=(real?"1RM: ":"Geschatte 1RM: ~")+Math.round(m)+" kg"+(S.bw>0?" · "+(m/S.bw).toFixed(2).replace(".",",")+"× lichaamsgewicht":"");
+ if(!plank){const real=Math.max(0,...S.e.filter(e=>e.x==x&&e.rm).map(e=>e.kg)),base=real||(b?b.kg:0);
+  if(S.bw>0&&base>0)est=(base/S.bw).toFixed(2).replace(".",",")+"× lichaamsgewicht ("+(real?"1RM":"beste set")+")";
   if(l){const st=l.kg<20?1:l.kg<60?2.5:5;sug=l.kg==0?(l.r+1)+" reps":l.r>=10?(l.kg+st)+" kg × 6":l.kg+" kg × "+(l.r+1)}}
  const o=open[nm],f=o=="f"?`<form data-x="${nm}">`+(plank?`<label class="w">Tijd<input name="t" placeholder="2:25 + 1:30" required></label>`:
   `<label>Gewicht (kg)<input name="kg" type="number" inputmode="decimal" step="any" value="${l&&l.kg!=null?l.kg:""}" required></label><label>Reps<input name="r" type="number" inputmode="numeric" value="${l&&l.r||""}" required></label>`)+
