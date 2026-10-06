@@ -33,6 +33,7 @@ form .chk input{width:auto}
 form button{grid-column:1/3;background:var(--ok);color:#fff;border:0;border-radius:10px;padding:11px;font-size:16px}
 .ch{margin-top:10px}.ch svg{width:100%;height:auto;display:block}.ch .t{font-size:11px;fill:var(--mu)}.ch .v{font-size:12px;fill:var(--tx);font-weight:600}.ch p{font-size:12px;color:var(--mu);margin:4px 0 0}
 .mv button{border:1px solid var(--ln);background:transparent;color:var(--tx);border-radius:8px;padding:4px 11px;margin-left:4px;font-size:14px}
+.bw{display:flex;align-items:center;gap:8px;margin:2px 4px 8px;color:var(--mu);font-size:14px}.bw input{width:80px;font-size:16px;padding:7px;border:1px solid var(--ln);border-radius:9px;background:var(--card);color:var(--tx)}
 .hist{margin-top:8px;font-size:14px}
 .hist div{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--ln)}
 .hist i{font-style:normal;color:var(--mu)}
@@ -109,9 +110,9 @@ function seed(src=SEED){const e=[];for(const k in src)for(const r of src[k]){con
  e.push(typeof r[1]=="string"?{id:uid(),x:K(k),d,t:r[1]}:{id:uid(),x:K(k),d,kg:r[1],r:r[2],rm:r[3]?1:0});}return e}
 function toast(m){const t=$("#toast");t.textContent=m;t.className="s";setTimeout(()=>t.className="",2200)}
 let saveT,user=null,authErr="";
-function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await setDoc(ref,{e:S.e,n:S.n||"",c:S.c||[],o:S.o||{},h:S.h||[]})}catch(e){toast("Opslaan mislukt")}},300)}
-onAuthStateChanged(auth,async u=>{user=u;ref=null;S={e:[],c:[],o:{},h:[]};pick=0;
- if(u){const r=doc(db,"users",u.uid);try{const sn=await getDoc(r);ref=r;if(sn.exists()){S.e=sn.data().e||[];S.n=sn.data().n||"";S.c=sn.data().c||[];S.o=sn.data().o||{};S.h=sn.data().h||[]}else pick=1}catch(e){toast("Laden mislukt, ververs de pagina")}
+function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await setDoc(ref,{e:S.e,n:S.n||"",c:S.c||[],o:S.o||{},h:S.h||[],bw:S.bw||0})}catch(e){toast("Opslaan mislukt")}},300)}
+onAuthStateChanged(auth,async u=>{user=u;ref=null;S={e:[],c:[],o:{},h:[],bw:0};pick=0;
+ if(u){const r=doc(db,"users",u.uid);try{const sn=await getDoc(r);ref=r;if(sn.exists()){S.e=sn.data().e||[];S.n=sn.data().n||"";S.c=sn.data().c||[];S.o=sn.data().o||{};S.h=sn.data().h||[];S.bw=sn.data().bw||0}else pick=1}catch(e){toast("Laden mislukt, ververs de pagina")}
   if(ref&&S.n=="Tim"&&!S.e.length&&!S.c.length){S.e=seed(SEEDT);save()}
   let mg=0;S.e.forEach(e=>{if(AL[e.x]){e.x=AL[e.x];mg=1}});if(mg)save()}
  $("#foot").innerHTML=u?`${u.email} · <a href="#" id="lo">uitloggen</a>`:"";render()});
@@ -130,11 +131,15 @@ function card(nm){const x=K(nm),h=sets(x),rm=S.e.filter(e=>e.x==x&&e.rm).sort((a
  let last="Nog niets gelogd";
  if(l){last=`Laatst: ${fmt(l.d)} · `+(plank?l.t:`${l.kg} kg × ${l.r}`);
   if(!plank&&p){const up=l.kg>p.kg||(l.kg==p.kg&&l.r>p.r);if(up)last+=` <span class="up">▲</span>`}}
+ let est="",sug="";
+ if(!plank){const E=e=>e.rm||e.r==1?e.kg:e.r<=12?e.kg*(1+e.r/30):0,m=Math.max(0,...S.e.filter(e=>e.x==x&&e.kg>0).map(E));
+  if(m>0)est="Geschatte 1RM: "+Math.round(m)+" kg"+(S.bw>0?" · "+(m/S.bw).toFixed(2).replace(".",",")+"× lichaamsgewicht":"");
+  if(l){const st=l.kg<20?1:l.kg<60?2.5:5;sug=l.kg==0?(l.r+1)+" reps":l.r>=10?(l.kg+st)+" kg × 6":l.kg+" kg × "+(l.r+1)}}
  const o=open[nm],f=o=="f"?`<form data-x="${nm}">`+(plank?`<label class="w">Tijd<input name="t" placeholder="2:25 + 1:30" required></label>`:
   `<label>Gewicht (kg)<input name="kg" type="number" inputmode="decimal" step="any" value="${l&&l.kg!=null?l.kg:""}" required></label><label>Reps<input name="r" type="number" inputmode="numeric" value="${l&&l.r||""}" required></label>`)+
-  `<label class="w">Datum<input name="d" type="date" value="${today()}"></label>`+(plank?"":`<label class="chk w"><input name="rm" type="checkbox"> Dit is een 1 rep max</label>`)+`<button>Opslaan</button></form>`:"";
- const cs=o=="c"?chart(x):"",hs=o=="h"?`<div class="hist">`+S.e.filter(e=>e.x==x).sort((a,b)=>(b.d||"").localeCompare(a.d||"")).map(e=>`<div><span>${fmt(e.d)}</span><span>${e.t||e.kg+" kg × "+e.r}${e.rm?" <b>1RM</b>":""}</span><button data-del="${e.id}" aria-label="Verwijder">✕</button></div>`).join("")+`</div>`:"";
- return `<div class="card"><div class="top"><div class="nm">${nm}</div>${pr?`<div class="pr">${pr}</div>`:""}${ordering?`<span class="mv"><button data-mv="${nm}|-1">▲</button><button data-mv="${nm}|1">▼</button><button data-xd="${nm}" aria-label="Verwijder oefening">✕</button></span>`:""}</div><div class="last">${last}</div>
+  `<label class="w">Datum<input name="d" type="date" value="${today()}"></label><label class="w">Notitie (optioneel)<input name="nt" maxlength="80" placeholder="bijv. betere form"></label>`+(plank?"":`<label class="chk w"><input name="rm" type="checkbox"> Dit is een 1 rep max</label>`)+`<button>Opslaan</button></form>`:"";
+ const cs=o=="c"?chart(x):"",hs=o=="h"?`<div class="hist">`+S.e.filter(e=>e.x==x).sort((a,b)=>(b.d||"").localeCompare(a.d||"")).map(e=>`<div><span>${fmt(e.d)}</span><span>${e.t||e.kg+" kg × "+e.r}${e.rm?" <b>1RM</b>":""}${e.nt?`<br><i>${e.nt}</i>`:""}</span><button data-del="${e.id}" aria-label="Verwijder">✕</button></div>`).join("")+`</div>`:"";
+ return `<div class="card"><div class="top"><div class="nm">${nm}</div>${pr?`<div class="pr">${pr}</div>`:""}${ordering?`<span class="mv"><button data-mv="${nm}|-1">▲</button><button data-mv="${nm}|1">▼</button><button data-xd="${nm}" aria-label="Verwijder oefening">✕</button></span>`:""}</div><div class="last">${last}</div>${est?`<div class="last">${est}</div>`:""}${sug?`<div class="last">💡 Volgende keer: ${sug}</div>`:""}
  <div class="row"><button class="p" data-f="${nm}">+ Set</button><button data-h="${nm}">Historie (${S.e.filter(e=>e.x==x).length})</button>${plank?"":`<button data-c="${nm}">📈</button>`}</div>${f}${cs}${hs}</div>`}
 let ordering=false;
 function list(){const b=DAYS[tab].ex.filter(n=>!(S.h||[]).includes(n)).concat((S.c||[]).filter(c=>c.d==tab).map(c=>c.n)),o=(S.o||{})[tab]||[],p=a=>o.indexOf(a)<0?999+b.indexOf(a):o.indexOf(a);return b.slice().sort((x,y)=>p(x)-p(y))}
@@ -142,7 +147,7 @@ function start(n){S.n=n;S.e=n=="Tygo"?seed():n=="Tim"?seed(SEEDT):[];pick=0;save
 function render(){if(!user){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Inloggen</div><form id="auth"><label class="w">E-mail<input name="m" type="email" required autocomplete="email"></label><label class="w">Wachtwoord (min. 6 tekens)<input name="p" type="password" minlength="6" required autocomplete="current-password"></label><button value="in">Inloggen</button><button value="new" style="background:var(--ac)">Account maken</button></form><div class="last">${authErr}</div></div>`;return}
  if(pick){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Wie ben je?</div><div class="last">Kies je naam, dan start je met je eigen schema. Wat je logt blijft alleen van jou.</div><div class="row"><button class="p" data-s="Tygo">Tygo</button><button class="p" data-s="Tim">Tim</button></div></div>`;return}
  document.querySelector("h1").textContent="🏋️ Gym Tracker"+(S.n?" · "+S.n:"");$("#tabs").innerHTML=DAYS.map((d,i)=>`<button class="${i==tab?"on":""}" data-t="${i}">${d.t}</button>`).join("");
- $("#list").innerHTML=`<div class="row" style="margin-top:0"><button data-ord="1">${ordering?"✓ Klaar":"✎ Aanpassen"}</button></div>`+list().map(card).join("")+`<div class="card"><form id="addx"><label class="w">Eigen oefening toevoegen aan deze dag<input name="n" placeholder="bijv. Biceps Curl cable" required maxlength="40"></label><button>+ Toevoegen</button></form></div>`}
+ $("#list").innerHTML=`<div class="bw">⚖️ Lichaamsgewicht <input id="bw" type="number" inputmode="decimal" step="any" value="${S.bw||""}"> kg</div><div class="row" style="margin-top:0"><button data-ord="1">${ordering?"✓ Klaar":"✎ Aanpassen"}</button></div>`+list().map(card).join("")+`<div class="card"><form id="addx"><label class="w">Eigen oefening toevoegen aan deze dag<input name="n" placeholder="bijv. Biceps Curl cable" required maxlength="40"></label><button>+ Toevoegen</button></form></div>`}
 document.addEventListener("click",ev=>{const t=ev.target;
  if(t.id=="lo"){ev.preventDefault();signOut(auth)}
  else if(t.dataset.ord){ordering=!ordering;render()}
@@ -163,8 +168,9 @@ document.addEventListener("submit",async ev=>{ev.preventDefault();const f=ev.tar
   if(!n)return;if(all.some(a=>a.toLowerCase()==n.toLowerCase())){toast("Die oefening bestaat al");return}
   S.c=S.c||[];S.c.push({n,d:tab});save();render();toast("Oefening toegevoegd ✓");return}
  const nm=f.dataset.x,x=K(nm),v=Object.fromEntries(new FormData(f));
- const n={id:uid(),x,d:v.d||today()};let msg="Opgeslagen ✓";
+ const n={id:uid(),x,d:v.d||today()};if(v.nt&&v.nt.trim())n.nt=v.nt.replace(/["<>&]/g,"").trim();let msg="Opgeslagen ✓";
  if(v.t)n.t=v.t.trim();else{n.kg=parseFloat(String(v.kg).replace(",","."));n.r=parseInt(v.r);n.rm=v.rm?1:0;
   if(n.rm)msg="Nieuwe 1RM opgeslagen 🏆";else{const b=best(x);if(b&&better(n,b))msg="Nieuw PR! 🔥"}}
  S.e.push(n);open[nm]=0;save();render();toast(msg)});
+document.addEventListener("change",ev=>{if(ev.target.id=="bw"){S.bw=parseFloat(String(ev.target.value).replace(",","."))||0;save();render();toast("Lichaamsgewicht opgeslagen ✓")}});
 </script></body></html>
