@@ -80,19 +80,38 @@ const SEED={"Preacher Curl dumbbell":[["27-08",59,8],["07-09",63,7],["28-09",16,
 "Ab Crunch":[["28-08",50,9],["21-09",50,9],["25-09",54,10]],
 "Ab Rotary Machine":[["28-08",36,8]],
 "Captains Chair":[["25-09",0,14]]};
+const SEEDT={"Preacher Curl dumbbell":[["02-10",8,7]],
+"Rear Delt Fly":[["28-09",32,6],["02-10",32,8]],
+"Hammer Curl dumbbell":[["28-09",8,6],["02-10",8,8]],
+"Seated Row cable":[["02-10",32,8]],
+"Cable Wrist Curl":[["27-08",73,7],["18-09",93,8]],
+"Cable Tricep Pushdown":[["25-09",36,7],["30-09",32,7],["05-10",32,8]],
+"Flat Bench Press":[["25-09",15,5],["30-09",20,7],["05-10",30,5]],
+"Pec Fly":[["25-09",45,7],["30-09",52,6],["05-10",52,7]],
+"Shoulder Press dumbbells":[["26-09",10,9],["30-09",10,9],["05-10",12,6]],
+"Lateral Raise dumbbell":[["25-09",6,8],["30-09",6,8],["05-10",7,7]],
+"Leg Press (plates)":[["28-08",120,12],["21-09",180,7]],
+"Seated Calf Raises":[["28-08",134,10],["21-09",134,14]],
+"Leg Curl":[["28-08",68.3,9],["21-09",68.3,9]],
+"Back Extension":[["28-08",93,8],["21-09",100,8]],
+"Abductor":[["28-08",66,8],["21-09",66,9]],
+"Adductor":[["28-08",73,9],["21-09",79,7]],
+"Ab Crunch":[["28-08",32,10],["21-09",32,10]],
+"Ab Rotary Machine":[["28-08",32,8]]};
 const AL={'Ab Crunch':'Crunches','Ab Rotary Machine':'Rotary Torso'},K=x=>AL[x]||x;
 const $=s=>document.querySelector(s);
 let S={e:[]},pick=0,tab=0,open={},ref=null,LS="gymtracker-v1";
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const fmt=d=>d?d.slice(8)+"-"+d.slice(5,7)+"-"+d.slice(2,4):"datum onbekend";
 const uid=()=>Math.random().toString(36).slice(2,9);
-function seed(){const e=[];for(const k in SEED)for(const r of SEED[k]){const d=r[0]?"2026-"+r[0].split("-").reverse().join("-"):"";
+function seed(src=SEED){const e=[];for(const k in src)for(const r of src[k]){const d=r[0]?"2026-"+r[0].split("-").reverse().join("-"):"";
  e.push(typeof r[1]=="string"?{id:uid(),x:K(k),d,t:r[1]}:{id:uid(),x:K(k),d,kg:r[1],r:r[2],rm:r[3]?1:0});}return e}
 function toast(m){const t=$("#toast");t.textContent=m;t.className="s";setTimeout(()=>t.className="",2200)}
 let saveT,user=null,authErr="";
-function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await setDoc(ref,{e:S.e,n:S.n||""})}catch(e){toast("Opslaan mislukt")}},300)}
-onAuthStateChanged(auth,async u=>{user=u;ref=null;S={e:[]};pick=0;
- if(u){const r=doc(db,"users",u.uid);try{const sn=await getDoc(r);ref=r;if(sn.exists()){S.e=sn.data().e||[];S.n=sn.data().n||""}else pick=1}catch(e){toast("Laden mislukt, ververs de pagina")}
+function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await setDoc(ref,{e:S.e,n:S.n||"",c:S.c||[]})}catch(e){toast("Opslaan mislukt")}},300)}
+onAuthStateChanged(auth,async u=>{user=u;ref=null;S={e:[],c:[]};pick=0;
+ if(u){const r=doc(db,"users",u.uid);try{const sn=await getDoc(r);ref=r;if(sn.exists()){S.e=sn.data().e||[];S.n=sn.data().n||"";S.c=sn.data().c||[]}else pick=1}catch(e){toast("Laden mislukt, ververs de pagina")}
+  if(ref&&S.n=="Tim"&&!S.e.length&&!S.c.length){S.e=seed(SEEDT);save()}
   let mg=0;S.e.forEach(e=>{if(AL[e.x]){e.x=AL[e.x];mg=1}});if(mg)save()}
  $("#foot").innerHTML=u?`${u.email} · <a href="#" id="lo">uitloggen</a>`:"";render()});
 const sets=x=>S.e.filter(e=>e.x==x&&!e.rm).sort((a,b)=>(b.d||"").localeCompare(a.d||""));
@@ -115,14 +134,15 @@ function card(nm){const x=K(nm),h=sets(x),rm=S.e.filter(e=>e.x==x&&e.rm).sort((a
   `<label class="w">Datum<input name="d" type="date" value="${today()}"></label>`+(plank?"":`<label class="chk w"><input name="rm" type="checkbox"> Dit is een 1 rep max</label>`)+`<button>Opslaan</button></form>`:"";
  const cs=o=="c"?chart(x):"",hs=o=="h"?`<div class="hist">`+S.e.filter(e=>e.x==x).sort((a,b)=>(b.d||"").localeCompare(a.d||"")).map(e=>`<div><span>${fmt(e.d)}</span><span>${e.t||e.kg+" kg × "+e.r}${e.rm?" <b>1RM</b>":""}</span><button data-del="${e.id}" aria-label="Verwijder">✕</button></div>`).join("")+`</div>`:"";
  return `<div class="card"><div class="top"><div class="nm">${nm}</div>${pr?`<div class="pr">${pr}</div>`:""}</div><div class="last">${last}</div>
- <div class="row"><button class="p" data-f="${nm}">+ Set</button><button data-h="${nm}">Historie (${S.e.filter(e=>e.x==x).length})</button>${plank?"":`<button data-c="${nm}">📈</button>`}</div>${f}${cs}${hs}</div>`}
-function start(n){S.n=n;S.e=n=="Tygo"?seed():[];pick=0;save();render()}
+ <div class="row"><button class="p" data-f="${nm}">+ Set</button><button data-h="${nm}">Historie (${S.e.filter(e=>e.x==x).length})</button>${plank?"":`<button data-c="${nm}">📈</button>`}${(S.c||[]).some(c=>c.n==nm)?`<button data-xd="${nm}" aria-label="Verwijder oefening">🗑</button>`:""}</div>${f}${cs}${hs}</div>`}
+function start(n){S.n=n;S.e=n=="Tygo"?seed():n=="Tim"?seed(SEEDT):[];pick=0;save();render()}
 function render(){if(!user){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Inloggen</div><form id="auth"><label class="w">E-mail<input name="m" type="email" required autocomplete="email"></label><label class="w">Wachtwoord (min. 6 tekens)<input name="p" type="password" minlength="6" required autocomplete="current-password"></label><button value="in">Inloggen</button><button value="new" style="background:var(--ac)">Account maken</button></form><div class="last">${authErr}</div></div>`;return}
  if(pick){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Wie ben je?</div><div class="last">Kies je naam, dan start je met je eigen schema. Wat je logt blijft alleen van jou.</div><div class="row"><button class="p" data-s="Tygo">Tygo</button><button class="p" data-s="Tim">Tim</button></div></div>`;return}
  document.querySelector("h1").textContent="🏋️ Gym Tracker"+(S.n?" · "+S.n:"");$("#tabs").innerHTML=DAYS.map((d,i)=>`<button class="${i==tab?"on":""}" data-t="${i}">${d.t}</button>`).join("");
- $("#list").innerHTML=DAYS[tab].ex.map(card).join("")}
+ $("#list").innerHTML=DAYS[tab].ex.concat((S.c||[]).filter(c=>c.d==tab).map(c=>c.n)).map(card).join("")+`<div class="card"><form id="addx"><label class="w">Eigen oefening toevoegen aan deze dag<input name="n" placeholder="bijv. Biceps Curl cable" required maxlength="40"></label><button>+ Toevoegen</button></form></div>`}
 document.addEventListener("click",ev=>{const t=ev.target;
  if(t.id=="lo"){ev.preventDefault();signOut(auth)}
+ else if(t.dataset.xd){const n=t.dataset.xd;if(confirm("Oefening en alle bijbehorende sets verwijderen?")){S.c=S.c.filter(c=>c.n!=n);S.e=S.e.filter(e=>e.x!=K(n));save();render()}}
  else if(t.dataset.s){start(t.dataset.s)}
  else if(t.dataset.t!=null){tab=+t.dataset.t;render()}
  else if(t.dataset.f){open[t.dataset.f]=open[t.dataset.f]=="f"?0:"f";render()}
@@ -131,6 +151,9 @@ document.addEventListener("click",ev=>{const t=ev.target;
  else if(t.dataset.del&&confirm("Deze set verwijderen?")){S.e=S.e.filter(e=>e.id!=t.dataset.del);save();render()}});
 document.addEventListener("submit",async ev=>{ev.preventDefault();const f=ev.target;
  if(f.id=="auth"){const v=Object.fromEntries(new FormData(f));authErr="";try{await(ev.submitter.value=="new"?createUserWithEmailAndPassword:signInWithEmailAndPassword)(auth,v.m,v.p)}catch(e){authErr="Mislukt ("+e.code.replace("auth/","")+")";render()}return}
+ if(f.id=="addx"){const n=f.n.value.replace(/["<>&\\]/g,"").trim();const all=DAYS.flatMap(d=>d.ex).concat((S.c||[]).map(c=>c.n));
+  if(!n)return;if(all.some(a=>a.toLowerCase()==n.toLowerCase())){toast("Die oefening bestaat al");return}
+  S.c=S.c||[];S.c.push({n,d:tab});save();render();toast("Oefening toegevoegd ✓");return}
  const nm=f.dataset.x,x=K(nm),v=Object.fromEntries(new FormData(f));
  const n={id:uid(),x,d:v.d||today()};let msg="Opgeslagen ✓";
  if(v.t)n.t=v.t.trim();else{n.kg=parseFloat(String(v.kg).replace(",","."));n.r=parseInt(v.r);n.rm=v.rm?1:0;
