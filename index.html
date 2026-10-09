@@ -62,7 +62,7 @@ form button{grid-column:1/3;background:var(--ok);color:#fff;border:0;border-radi
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,doc,getDoc,setDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getFirestore,doc,getDoc,setDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {firebaseConfig} from "./firebase-config.js";
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
@@ -84,10 +84,10 @@ const up=(n,k)=>{const v=nextKg(n,k);return v?String(v).replace(".",",")+" kg":"
 function stag(x){const by={};S.e.filter(e=>e.x==x&&!e.rm&&e.d&&e.kg!=null).forEach(e=>{const o=by[e.d];if(!o||better(e,o))by[e.d]=e});const t=Object.keys(by).sort().slice(-3).map(d=>by[d]);return t.length==3&&t.every(e=>e.kg==t[0].kg&&e.r==t[0].r)?t[0]:null}
 function tips(x,n){const m=[];if(n.kg>0&&n.r>=10)m.push("💡 "+n.r+" reps! Probeer volgende keer "+up(x,n.kg));const g=stag(x);if(g)m.push("🔁 3 trainingen hetzelfde ("+g.kg+" kg × "+g.r+"). Probeer iets zwaarder of 1 rep extra");return m}
 let saveT,user=null,authErr="";
-function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await setDoc(ref,{e:S.e,n:S.n||"",c:S.c||[],o:S.o||{},h:S.h||[],bw:S.bw||0,ss:S.ss||[],pn:S.pn||{}})}catch(e){toast("Opslaan mislukt")}},300)}
+function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await pub();await setDoc(ref,{e:S.e,n:S.n||"",c:S.c||[],o:S.o||{},h:S.h||[],bw:S.bw||0,ss:S.ss||[],pn:S.pn||{},lb:S.lb!==false})}catch(e){toast("Opslaan mislukt")}},300)}
 onAuthStateChanged(auth,async u=>{user=u;ref=null;S={e:[],c:[],o:{},h:[],bw:0,ss:[],pn:{}};pick=0;
- if(u){const r=doc(db,"users",u.uid);try{const sn=await getDoc(r);ref=r;if(sn.exists()){S.e=sn.data().e||[];S.n=sn.data().n||"";S.c=sn.data().c||[];S.o=sn.data().o||{};S.h=sn.data().h||[];S.bw=sn.data().bw||0;S.ss=sn.data().ss||[];S.pn=sn.data().pn||{}}else pick=1}catch(e){toast("Laden mislukt, ververs de pagina")}
-  let mg=0;S.e.forEach(e=>{if(AL[e.x]){e.x=AL[e.x];mg=1}});if(mg)save()}
+ if(u){const r=doc(db,"users",u.uid);try{const sn=await getDoc(r);ref=r;if(sn.exists()){S.e=sn.data().e||[];S.n=sn.data().n||"";S.c=sn.data().c||[];S.o=sn.data().o||{};S.h=sn.data().h||[];S.bw=sn.data().bw||0;S.ss=sn.data().ss||[];S.pn=sn.data().pn||{};S.lb=sn.data().lb!==false}else pick=1}catch(e){toast("Laden mislukt, ververs de pagina")}
+  let mg=0;S.e.forEach(e=>{if(AL[e.x]){e.x=AL[e.x];mg=1}});if(mg)save();pub()}
  $("#foot").innerHTML=u?`${u.email} · <a href="#" id="lo">uitloggen</a>`:"";render()});
 const sets=x=>S.e.filter(e=>e.x==x&&!e.rm).sort((a,b)=>(b.d||"").localeCompare(a.d||""));
 const better=(a,b)=>!b||a.kg>b.kg||(a.kg==b.kg&&a.r>b.r);
@@ -167,12 +167,22 @@ function finish(){const st=+localStorage.getItem("gt-start");if(!st)return;const
  el.onclick=ev=>{const b=ev.target.closest("[data-sc]");if(!b)return;const v=b.dataset.sc;
   if(v=="skip"||v=="ok"){S.ss=S.ss||[];S.ss.push({d:today(),m,...(v=="ok"?r:{})});localStorage.removeItem("gt-start");save();el.remove();render();toast("Training opgeslagen ✓")}
   else{r[v.slice(0,2)]=+v.slice(2);draw()}}}
+async function pub(){if(!user||!ref)return;try{const x=xpOf();await setDoc(doc(db,"leaderboard",user.uid),S.lb===false?{on:false}:{on:true,n:S.n||"Anoniem",xp:x,l:lvOf(x),pr:prAll().length,sets:S.e.filter(e=>!e.rm).length,days:new Set(S.e.filter(e=>e.d).map(e=>e.d)).size,ws:wkStreak(),t:Date.now()})}catch(e){}}
+let lbS="xp",lbD=[];const esc=t=>String(t).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";"),num=v=>Number(v)||0;
+async function lbView(){$("#list").innerHTML=`<div class="last" style="text-align:center">Laden…</div>`;
+ try{const sn=await getDocs(collection(db,"leaderboard"));lbD=sn.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.on===true)}catch(e){$("#list").innerHTML=`<div class="card"><div class="last">Kon het leaderboard niet laden. Controleer of je de nieuwe Firestore-regels hebt gepubliceerd.</div></div>`;return}
+ lbDraw()}
+function lbDraw(){if(tab!=5)return;const o={xp:"XP",pr:"PR's",days:"Dagen",ws:"Weken op rij"},rows=lbD.slice().sort((a,b)=>num(b[lbS])-num(a[lbS])||num(b.xp)-num(a.xp));
+ $("#list").innerHTML=`<div class="row" style="margin-top:0">${Object.keys(o).map(k=>`<button data-ls="${k}" class="${k==lbS?"p":""}">${o[k]}</button>`).join("")}</div>`+
+ (rows.length?rows.map((r,i)=>`<div class="card" style="${r.id==user.uid?"border-color:var(--ac)":""}"><div class="top"><div class="nm">${["🥇","🥈","🥉"][i]||(i+1)+"."} ${esc(String(r.n||"").slice(0,20))}</div><div class="pr">${num(r[lbS])} ${o[lbS]}</div></div><div class="last">Level ${num(r.l)} · ${ttl(Math.max(1,num(r.l)))} · ${num(r.xp)} XP · ${num(r.pr)} PR's · ${num(r.days)} dagen</div></div>`).join(""):`<div class="card"><div class="last">Nog niemand op het leaderboard.</div></div>`)+
+ `<div class="last" style="text-align:center;margin:12px 0">Iedereen met een account ziet je naam en stats hier.</div><div class="row"><button data-lbt="1">${S.lb===false?"Doe weer mee aan leaderboard":"Verberg mij uit leaderboard"}</button></div>`}
 let ordering=false;
 function list(){const b=DAYS[tab].ex.filter(n=>!(S.h||[]).includes(n)).concat((S.c||[]).filter(c=>c.d==tab).map(c=>c.n)),o=(S.o||{})[tab]||[],p=a=>o.indexOf(a)<0?999+b.indexOf(a):o.indexOf(a);return b.slice().sort((x,y)=>p(x)-p(y))}
 function start(n){S.n=n;S.e=[];pick=0;save();render()}
 function render(){tmDraw();if(!user){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Inloggen</div><form id="auth"><label class="w">E-mail<input name="m" type="email" required autocomplete="email"></label><label class="w">Wachtwoord (min. 6 tekens)<input name="p" type="password" minlength="6" required autocomplete="current-password"></label><button value="in">Inloggen</button><button value="new" style="background:var(--ac)">Account maken</button><button type="button" data-pw="1" style="background:none;color:var(--mu);font-size:14px">Wachtwoord vergeten?</button></form><div class="last">${authErr}</div></div>`;return}
  if(pick){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Welkom! 👋</div><div class="last">Je begint met een leeg schema. Wat je logt blijft alleen van jou.</div><form id="nm"><label class="w">Hoe heet je?<input name="n" required maxlength="20" autocomplete="given-name"></label><button>Start</button></form></div>`;return}
- document.querySelector("h1").textContent="🏋️ Gym Tracker"+(S.n?" · "+S.n:"")+(user&&!pick?" · Lv "+lvOf(xpOf()):"");$("#tabs").innerHTML=DAYS.map((d,i)=>`<button class="${i==tab?"on":""}" data-t="${i}">${d.t}</button>`).join("")+`<button class="${tab==4?"on":""}" data-t="4">🎁 Wrapped</button>`;
+ document.querySelector("h1").textContent="🏋️ Gym Tracker"+(S.n?" · "+S.n:"")+(user&&!pick?" · Lv "+lvOf(xpOf()):"");$("#tabs").innerHTML=DAYS.map((d,i)=>`<button class="${i==tab?"on":""}" data-t="${i}">${d.t}</button>`).join("")+`<button class="${tab==4?"on":""}" data-t="4">🎁 Wrapped</button><button class="${tab==5?"on":""}" data-t="5">🏆 Leaderboard</button>`;
+ if(tab==5){lbView();return}
  if(tab==4){$("#list").innerHTML=wview();return}
  $("#list").innerHTML=`<div class="bw">⚖️ Lichaamsgewicht <input id="bw" type="number" inputmode="decimal" step="any" value="${S.bw||""}"> kg</div><div class="row" style="margin-top:0"><button data-ord="1">${ordering?"✓ Klaar":"✎ Aanpassen"}</button></div>`+list().map(card).join("")+`<div class="card"><form id="addx"><label class="w">Eigen oefening toevoegen aan deze dag<input name="n" placeholder="bijv. Biceps Curl cable" required maxlength="40"></label><label class="w">Meten in<select name="t"><option value="kg">Gewicht × reps</option><option value="t">Tijd (bijv. plank, dead hang)</option></select></label><button>+ Toevoegen</button></form></div>`}
 document.addEventListener("click",ev=>{const t=ev.target;if(t.closest("#wr,#sc"))return;const wp=t.closest("[data-wp]");if(wp){story(+wp.dataset.wp);return}const wb=t.closest("[data-wy]");if(wb){wy=+wb.dataset.wy;render();return}
@@ -186,6 +196,8 @@ document.addEventListener("click",ev=>{const t=ev.target;if(t.closest("#wr,#sc")
   if(!vis.some(a=>K(a)==K(n)))S.e=S.e.filter(e=>e.x!=K(n));save();render()}}
  else if(t.dataset.pw){const m=document.querySelector("#auth [name=m]").value.trim();if(!m)toast("Vul eerst je e-mail in");else sendPasswordResetEmail(auth,m).then(()=>toast("Mail om je wachtwoord te herstellen verstuurd (check ook spam)"),()=>toast("Versturen mislukt"))}
  else if(t.dataset.t!=null){tab=+t.dataset.t;render()}
+ else if(t.dataset.ls){lbS=t.dataset.ls;lbDraw()}
+ else if(t.dataset.lbt){S.lb=S.lb===false;save();pub().then(render)}
  else if(t.dataset.ts){localStorage.setItem("gt-start",Date.now());tmDraw();toast("Training gestart ⏱")}
  else if(t.dataset.te){finish()}
  else if(t.dataset.w){open[t.dataset.w]=open[t.dataset.w]=="w"?0:"w";render()}
