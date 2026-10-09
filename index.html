@@ -44,7 +44,7 @@ form button{grid-column:1/3;background:var(--ok);color:#fff;border:0;border-radi
 .hist i{font-style:normal;color:var(--mu)}
 .hist b{color:var(--ac);font-weight:600}
 .hist button{border:0;background:none;color:var(--mu);font-size:16px;padding:0 6px}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:20px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:20px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9;max-width:88vw;text-align:center;white-space:pre-line}
 #toast.s{opacity:1}
 .foot{text-align:center;color:var(--mu);font-size:12px;margin-top:18px}
 </style></head><body><main>
@@ -113,7 +113,12 @@ const fmt=d=>d?d.slice(8)+"-"+d.slice(5,7)+"-"+d.slice(2,4):"datum onbekend";
 const uid=()=>Math.random().toString(36).slice(2,9);
 function seed(src=SEED){const e=[];for(const k in src)for(const r of src[k]){const d=r[0]?"2026-"+r[0].split("-").reverse().join("-"):"";
  e.push(typeof r[1]=="string"?{id:uid(),x:K(k),d,t:r[1]}:{id:uid(),x:K(k),d,kg:r[1],r:r[2],rm:r[3]?1:0});}return e}
-function toast(m){const t=$("#toast");t.textContent=m;t.className="s";setTimeout(()=>t.className="",2200)}
+let tt;function toast(m,ms=2200){const t=$("#toast");t.textContent=m;t.className="s";clearTimeout(tt);tt=setTimeout(()=>t.className="",ms)}
+const isDB=n=>/dum+b+e+l|\bdb\b/i.test(n),isBench=n=>/bench/i.test(n);
+const nextKg=(n,k)=>isDB(n)?(k>=10?k+2:Math.floor(k)+1):isBench(n)?k+2.5:null;
+const up=(n,k)=>{const v=nextKg(n,k);return v?String(v).replace(".",",")+" kg":"een gewicht hoger"};
+function stag(x){const by={};S.e.filter(e=>e.x==x&&!e.rm&&e.d&&e.kg!=null).forEach(e=>{const o=by[e.d];if(!o||better(e,o))by[e.d]=e});const t=Object.keys(by).sort().slice(-3).map(d=>by[d]);return t.length==3&&t.every(e=>e.kg==t[0].kg&&e.r==t[0].r)?t[0]:null}
+function tips(x,n){const m=[];if(n.kg>0&&n.r>=10)m.push("💡 "+n.r+" reps! Probeer volgende keer "+up(x,n.kg));const g=stag(x);if(g)m.push("🔁 3 trainingen hetzelfde ("+g.kg+" kg × "+g.r+"). Probeer iets zwaarder of 1 rep extra");return m}
 let saveT,user=null,authErr="";
 function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await setDoc(ref,{e:S.e,n:S.n||"",c:S.c||[],o:S.o||{},h:S.h||[],bw:S.bw||0})}catch(e){toast("Opslaan mislukt")}},300)}
 onAuthStateChanged(auth,async u=>{user=u;ref=null;S={e:[],c:[],o:{},h:[],bw:0};pick=0;
@@ -139,13 +144,13 @@ function card(nm){const x=K(nm),h=sets(x),rm=S.e.filter(e=>e.x==x&&e.rm).sort((a
  let est="",sug="";
  if(!plank){const real=Math.max(0,...S.e.filter(e=>e.x==x&&e.rm).map(e=>e.kg)),base=real||(b?b.kg:0);
   if(S.bw>0&&base>0)est=(base/S.bw).toFixed(2).replace(".",",")+"× lichaamsgewicht ("+(real?"1RM":"beste set")+")";
-  if(l){const st=l.kg<20?1:l.kg<60?2.5:5;sug=l.kg==0?(l.r+1)+" reps":l.r>=10?(l.kg+st)+" kg × 6":l.kg+" kg × "+(l.r+1)}}
+  if(l){sug=l.kg==0?(l.r+1)+" reps":l.r>=10?up(x,l.kg):l.kg+" kg × "+(l.r+1)}}
  const o=open[nm],f=o=="f"?`<form data-x="${nm}">`+(plank?`<label class="w">Tijd<input name="t" placeholder="bijv. 1:30" required></label>`:
-  `<label>Gewicht (kg)<input name="kg" type="number" inputmode="decimal" step="any" value="${l&&l.kg!=null?l.kg:""}" required></label><label>Reps<input name="r" type="number" inputmode="numeric" value="${l&&l.r||""}" required></label>`)+
+  `<label>Gewicht (kg)<input name="kg" type="number" inputmode="decimal" step="any" value="${l&&l.kg!=null?l.kg:""}" required></label><label>Reps<input name="r" type="number" inputmode="numeric" value="${l&&l.r||""}" required></label><label class="w">Aantal sets (zelfde gewicht en reps)<input name="ns" type="number" inputmode="numeric" min="1" max="10" value="1"></label>`)+
   `<label class="w">Datum<input name="d" type="date" value="${today()}"></label><label class="w">Notitie (optioneel)<input name="nt" maxlength="80" placeholder="bijv. betere form"></label>`+(plank?"":`<label class="chk w"><input name="rm" type="checkbox"> Dit is een 1 rep max</label>`)+`<button>Opslaan</button></form>`:"";
  const cs=o=="c"?chart(x):"",hs=o=="h"?`<div class="hist">`+S.e.filter(e=>e.x==x).sort((a,b)=>(b.d||"").localeCompare(a.d||"")).map(e=>`<div><span>${fmt(e.d)}</span><span>${e.t||e.kg+" kg × "+e.r}${e.rm?" <b>1RM</b>":""}${e.nt?`<br><i>${e.nt}</i>`:""}</span><button data-del="${e.id}" aria-label="Verwijder">✕</button></div>`).join("")+`</div>`:"";
- return `<div class="card"><div class="top"><div class="nm">${nm}</div>${pr?`<div class="pr">${pr}</div>`:""}${ordering?`<span class="mv"><button data-mv="${nm}|-1">▲</button><button data-mv="${nm}|1">▼</button>${(S.c||[]).some(c=>c.n==nm)?`<button data-ty="${nm}" aria-label="Wissel tussen gewicht en tijd">⏱</button>`:""}<button data-xd="${nm}" aria-label="Verwijder oefening">✕</button></span>`:""}</div><div class="last">${last}</div>${est?`<div class="last">${est}</div>`:""}${sug?`<div class="last">💡 Volgende keer: ${sug}</div>`:""}
- <div class="row"><button class="p" data-f="${nm}">+ Set</button><button data-h="${nm}">Historie (${S.e.filter(e=>e.x==x).length})</button>${plank?"":`<button data-c="${nm}">📈</button>`}</div>${f}${cs}${hs}</div>`}
+ return `<div class="card"><div class="top"><div class="nm">${nm}</div>${pr?`<div class="pr">${pr}</div>`:""}${ordering?`<span class="mv"><button data-mv="${nm}|-1">▲</button><button data-mv="${nm}|1">▼</button>${(S.c||[]).some(c=>c.n==nm)?`<button data-ty="${nm}" aria-label="Wissel tussen gewicht en tijd">⏱</button>`:""}<button data-xd="${nm}" aria-label="Verwijder oefening">✕</button></span>`:""}</div><div class="last">${last}</div>${est?`<div class="last">${est}</div>`:""}${sug?`<div class="last">💡 Volgende keer: ${sug}</div>`:""}${!plank&&stag(x)?`<div class="last">🔁 3 trainingen hetzelfde, probeer iets zwaarder of 1 rep extra</div>`:""}
+ <div class="row"><button class="p" data-f="${nm}">+ Set</button>${l?`<button data-same="${nm}">↻ Zelfde</button>`:""}<button data-h="${nm}">Historie (${S.e.filter(e=>e.x==x).length})</button>${plank?"":`<button data-c="${nm}">📈</button>`}</div>${f}${cs}${hs}</div>`}
 let wy=new Date().getFullYear();
 const WL=["Jan – apr","Mei – aug","Sep – dec","Heel jaar"],nf=n=>Math.round(n).toLocaleString("nl-NL"),WG=["#e8590c,#f59f00","#7048e8,#e64980","#1971c2,#12b886","#c2255c,#f76707","#2b8a3e,#94d82d","#5f3dc4,#1c7ed6","#e8590c,#c2255c"];
 const rng=(y,p)=>{const a=p==3?1:p*4+1,b=p==3?12:p*4+4,z=n=>String(n).padStart(2,"0");return[y+"-"+z(a)+"-00",y+"-"+z(b)+"-32"]};
@@ -192,6 +197,7 @@ document.addEventListener("click",ev=>{const t=ev.target;if(t.closest("#wr"))ret
   if(!vis.some(a=>K(a)==K(n)))S.e=S.e.filter(e=>e.x!=K(n));save();render()}}
  else if(t.dataset.s){start(t.dataset.s)}
  else if(t.dataset.t!=null){tab=+t.dataset.t;render()}
+ else if(t.dataset.same){const nm=t.dataset.same,x=K(nm),l=sets(x)[0];if(l){const n={id:uid(),x,d:today()};if(l.t)n.t=l.t;else{n.kg=l.kg;n.r=l.r;n.rm=0}S.e.push(n);save();render();const tp=tips(x,n);toast(["Zelfde als vorige keer opgeslagen ✓",...tp].join("\n"),tp.length?6000:2200)}}
  else if(t.dataset.f){open[t.dataset.f]=open[t.dataset.f]=="f"?0:"f";render()}
  else if(t.dataset.c){open[t.dataset.c]=open[t.dataset.c]=="c"?0:"c";render()}
  else if(t.dataset.h){open[t.dataset.h]=open[t.dataset.h]=="h"?0:"h";render()}
@@ -205,6 +211,7 @@ document.addEventListener("submit",async ev=>{ev.preventDefault();const f=ev.tar
  const n={id:uid(),x,d:v.d||today()};if(v.nt&&v.nt.trim())n.nt=v.nt.replace(/["<>&]/g,"").trim();let msg="Opgeslagen ✓";
  if(v.t)n.t=v.t.trim();else{n.kg=parseFloat(String(v.kg).replace(",","."));n.r=parseInt(v.r);n.rm=v.rm?1:0;
   if(n.rm)msg="Nieuwe 1RM opgeslagen 🏆";else{const b=best(x);if(b&&better(n,b))msg="Nieuw PR! 🔥"}}
- S.e.push(n);open[nm]=0;save();render();toast(msg)});
+const ns=Math.max(1,Math.min(10,parseInt(v.ns)||1));S.e.push(n);if(!n.rm)for(let k=1;k<ns;k++)S.e.push({...n,id:uid()});
+ open[nm]=0;save();render();const tp=n.rm?[]:tips(x,n);toast([msg+(ns>1&&!n.rm?" ("+ns+" sets)":""),...tp].join("\n"),tp.length?6000:2200)});
 document.addEventListener("change",ev=>{if(ev.target.id=="bw"){S.bw=parseFloat(String(ev.target.value).replace(",","."))||0;save();render();toast("Lichaamsgewicht opgeslagen ✓")}});
 </script></body></html>
