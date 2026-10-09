@@ -39,6 +39,11 @@ form button{grid-column:1/3;background:var(--ok);color:#fff;border:0;border-radi
 .wb{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:14px;right:14px;display:flex;gap:4px}.wb i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.35)}.wb i.on{background:#fff}
 .wx{position:absolute;top:calc(26px + env(safe-area-inset-top,0px));right:14px;background:none;border:0;color:#fff;font-size:22px;padding:8px}
 .wbig{font-size:68px;font-weight:800;line-height:1.05}.wbig2{font-size:34px;font-weight:800;line-height:1.15}.wsm{font-size:19px;opacity:.92;margin-top:12px;line-height:1.5}
+.row button{min-width:0;padding:8px 4px}
+.bar{height:8px;background:var(--ln);border-radius:5px;margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+.bd{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.bd span{font-size:12px;padding:4px 8px;border-radius:8px;background:color-mix(in srgb,var(--ac) 15%,transparent);color:var(--ac)}.bd span.off{opacity:.35;filter:grayscale(1)}
+.tmb{width:100%;margin:0 0 8px;border:1px solid var(--ln);background:var(--card);color:var(--tx);border-radius:10px;padding:9px;font-size:14px}.tmb.on{background:var(--ok);color:#fff;border-color:var(--ok)}
+#sc{position:fixed;inset:0;z-index:21;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:18px}#sc .card{width:100%;max-width:420px}
 .hist{margin-top:8px;font-size:14px}
 .hist div{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--ln)}
 .hist i{font-style:normal;color:var(--mu)}
@@ -50,6 +55,7 @@ form button{grid-column:1/3;background:var(--ok);color:#fff;border:0;border-radi
 </style></head><body><main>
 <h1>🏋️ Gym Tracker</h1>
 <div class="tabs" id="tabs"></div>
+<div id="tm"></div>
 <div id="list"></div>
 <div class="foot" id="foot"></div>
 </main><div id="toast"></div>
@@ -120,9 +126,9 @@ const up=(n,k)=>{const v=nextKg(n,k);return v?String(v).replace(".",",")+" kg":"
 function stag(x){const by={};S.e.filter(e=>e.x==x&&!e.rm&&e.d&&e.kg!=null).forEach(e=>{const o=by[e.d];if(!o||better(e,o))by[e.d]=e});const t=Object.keys(by).sort().slice(-3).map(d=>by[d]);return t.length==3&&t.every(e=>e.kg==t[0].kg&&e.r==t[0].r)?t[0]:null}
 function tips(x,n){const m=[];if(n.kg>0&&n.r>=10)m.push("💡 "+n.r+" reps! Probeer volgende keer "+up(x,n.kg));const g=stag(x);if(g)m.push("🔁 3 trainingen hetzelfde ("+g.kg+" kg × "+g.r+"). Probeer iets zwaarder of 1 rep extra");return m}
 let saveT,user=null,authErr="";
-function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await setDoc(ref,{e:S.e,n:S.n||"",c:S.c||[],o:S.o||{},h:S.h||[],bw:S.bw||0})}catch(e){toast("Opslaan mislukt")}},300)}
-onAuthStateChanged(auth,async u=>{user=u;ref=null;S={e:[],c:[],o:{},h:[],bw:0};pick=0;
- if(u){const r=doc(db,"users",u.uid);try{const sn=await getDoc(r);ref=r;if(sn.exists()){S.e=sn.data().e||[];S.n=sn.data().n||"";S.c=sn.data().c||[];S.o=sn.data().o||{};S.h=sn.data().h||[];S.bw=sn.data().bw||0}else pick=1}catch(e){toast("Laden mislukt, ververs de pagina")}
+function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await setDoc(ref,{e:S.e,n:S.n||"",c:S.c||[],o:S.o||{},h:S.h||[],bw:S.bw||0,ss:S.ss||[],pn:S.pn||{}})}catch(e){toast("Opslaan mislukt")}},300)}
+onAuthStateChanged(auth,async u=>{user=u;ref=null;S={e:[],c:[],o:{},h:[],bw:0,ss:[],pn:{}};pick=0;
+ if(u){const r=doc(db,"users",u.uid);try{const sn=await getDoc(r);ref=r;if(sn.exists()){S.e=sn.data().e||[];S.n=sn.data().n||"";S.c=sn.data().c||[];S.o=sn.data().o||{};S.h=sn.data().h||[];S.bw=sn.data().bw||0;S.ss=sn.data().ss||[];S.pn=sn.data().pn||{}}else pick=1}catch(e){toast("Laden mislukt, ververs de pagina")}
   if(ref&&S.n=="Tim"&&!S.e.length&&!S.c.length){S.e=seed(SEEDT);save()}
   let mg=0;S.e.forEach(e=>{if(AL[e.x]){e.x=AL[e.x];mg=1}});if(mg)save()}
  $("#foot").innerHTML=u?`${u.email} · <a href="#" id="lo">uitloggen</a>`:"";render()});
@@ -141,25 +147,26 @@ function card(nm){const x=K(nm),h=sets(x),rm=S.e.filter(e=>e.x==x&&e.rm).sort((a
  let last="Nog niets gelogd";
  if(l){last=`Laatst: ${fmt(l.d)} · `+(plank?l.t:`${l.kg} kg × ${l.r}`);
   if(!plank&&p){const up=l.kg>p.kg||(l.kg==p.kg&&l.r>p.r);if(up)last+=` <span class="up">▲</span>`}}
- let est="",sug="";
+ let est="",sug="",pn=(S.pn||{})[x];
  if(!plank){const real=Math.max(0,...S.e.filter(e=>e.x==x&&e.rm).map(e=>e.kg)),base=real||(b?b.kg:0);
   if(S.bw>0&&base>0)est=(base/S.bw).toFixed(2).replace(".",",")+"× lichaamsgewicht ("+(real?"1RM":"beste set")+")";
   if(l){sug=l.kg==0?(l.r+1)+" reps":l.r>=10?up(x,l.kg):l.kg+" kg × "+(l.r+1)}}
  const o=open[nm],f=o=="f"?`<form data-x="${nm}">`+(plank?`<label class="w">Tijd<input name="t" placeholder="bijv. 1:30" required></label>`:
   `<label>Gewicht (kg)<input name="kg" type="number" inputmode="decimal" step="any" value="${l&&l.kg!=null?l.kg:""}" required></label><label>Reps<input name="r" type="number" inputmode="numeric" value="${l&&l.r||""}" required></label><label class="w">Aantal sets (zelfde gewicht en reps)<input name="ns" type="number" inputmode="numeric" min="1" max="10" value="1"></label>`)+
   `<label class="w">Datum<input name="d" type="date" value="${today()}"></label><label class="w">Notitie (optioneel)<input name="nt" maxlength="80" placeholder="bijv. betere form"></label>`+(plank?"":`<label class="chk w"><input name="rm" type="checkbox"> Dit is een 1 rep max</label>`)+`<button>Opslaan</button></form>`:"";
- const cs=o=="c"?chart(x):"",hs=o=="h"?`<div class="hist">`+S.e.filter(e=>e.x==x).sort((a,b)=>(b.d||"").localeCompare(a.d||"")).map(e=>`<div><span>${fmt(e.d)}</span><span>${e.t||e.kg+" kg × "+e.r}${e.rm?" <b>1RM</b>":""}${e.nt?`<br><i>${e.nt}</i>`:""}</span><button data-del="${e.id}" aria-label="Verwijder">✕</button></div>`).join("")+`</div>`:"";
- return `<div class="card"><div class="top"><div class="nm">${nm}</div>${pr?`<div class="pr">${pr}</div>`:""}${ordering?`<span class="mv"><button data-mv="${nm}|-1">▲</button><button data-mv="${nm}|1">▼</button>${(S.c||[]).some(c=>c.n==nm)?`<button data-ty="${nm}" aria-label="Wissel tussen gewicht en tijd">⏱</button>`:""}<button data-xd="${nm}" aria-label="Verwijder oefening">✕</button></span>`:""}</div><div class="last">${last}</div>${est?`<div class="last">${est}</div>`:""}${sug?`<div class="last">💡 Volgende keer: ${sug}</div>`:""}${!plank&&stag(x)?`<div class="last">🔁 3 trainingen hetzelfde, probeer iets zwaarder of 1 rep extra</div>`:""}
- <div class="row"><button class="p" data-f="${nm}">+ Set</button>${l?`<button data-same="${nm}">↻ Zelfde</button>`:""}<button data-h="${nm}">Historie (${S.e.filter(e=>e.x==x).length})</button>${plank?"":`<button data-c="${nm}">📈</button>`}</div>${f}${cs}${hs}</div>`}
+ const wu=o=="w"&&l&&l.kg>0&&!plank?warm(nm,l.kg):"",cs=o=="c"?chart(x):"",hs=o=="h"?`<div class="hist">`+S.e.filter(e=>e.x==x).sort((a,b)=>(b.d||"").localeCompare(a.d||"")).map(e=>`<div><span>${fmt(e.d)}</span><span>${e.t||e.kg+" kg × "+e.r}${e.rm?" <b>1RM</b>":""}${e.nt?`<br><i>${e.nt}</i>`:""}</span><button data-del="${e.id}" aria-label="Verwijder">✕</button></div>`).join("")+`</div>`:"";
+ return `<div class="card"><div class="top"><div class="nm">${nm}</div>${pr?`<div class="pr">${pr}</div>`:""}${ordering?`<span class="mv"><button data-mv="${nm}|-1">▲</button><button data-mv="${nm}|1">▼</button>${(S.c||[]).some(c=>c.n==nm)?`<button data-ty="${nm}" aria-label="Wissel tussen gewicht en tijd">⏱</button>`:""}<button data-xd="${nm}" aria-label="Verwijder oefening">✕</button></span>`:""}</div>${pn?`<div class="last" data-pn="${nm}" style="cursor:pointer">📌 ${pn}</div>`:ordering?`<div class="last" data-pn="${nm}" style="cursor:pointer">＋ Vaste notitie</div>`:""}<div class="last">${last}</div>${est?`<div class="last">${est}</div>`:""}${sug?`<div class="last">💡 Volgende keer: ${sug}</div>`:""}${!plank&&stag(x)?`<div class="last">🔁 3 trainingen hetzelfde, probeer iets zwaarder of 1 rep extra</div>`:""}
+ <div class="row"><button class="p" data-f="${nm}">+ Set</button>${l?`<button data-same="${nm}">↻ Zelfde</button>`:""}<button data-h="${nm}">Historie</button>${plank?"":`<button data-c="${nm}">📈</button>`}${!plank&&l&&l.kg>0?`<button data-w="${nm}">🔥</button>`:""}</div>${f}${cs}${wu}${hs}</div>`}
 let wy=new Date().getFullYear();
 const WL=["Jan – apr","Mei – aug","Sep – dec","Heel jaar"],nf=n=>Math.round(n).toLocaleString("nl-NL"),WG=["#e8590c,#f59f00","#7048e8,#e64980","#1971c2,#12b886","#c2255c,#f76707","#2b8a3e,#94d82d","#5f3dc4,#1c7ed6","#e8590c,#c2255c"];
 const rng=(y,p)=>{const a=p==3?1:p*4+1,b=p==3?12:p*4+4,z=n=>String(n).padStart(2,"0");return[y+"-"+z(a)+"-00",y+"-"+z(b)+"-32"]};
 const inR=(e,r)=>e.d&&e.d>r[0]&&e.d<r[1];
 function wview(){const ys=[...new Set(S.e.map(e=>e.d&&+e.d.slice(0,4)).filter(Boolean).concat(new Date().getFullYear()))].sort();
- return `<div class="row" style="margin-top:0">${ys.map(y=>`<button data-wy="${y}" class="${y==wy?"p":""}">${y}</button>`).join("")}</div>`+WL.map((l,p)=>{const r=rng(wy,p),n=S.e.filter(e=>inR(e,r)).length,on=today()>r[0]&&today()<r[1];
+ return lvCard()+sesCard()+`<div class="row" style="margin-top:0">${ys.map(y=>`<button data-wy="${y}" class="${y==wy?"p":""}">${y}</button>`).join("")}</div>`+WL.map((l,p)=>{const r=rng(wy,p),n=S.e.filter(e=>inR(e,r)).length,on=today()>r[0]&&today()<r[1];
   return `<div class="card" data-wp="${p}" style="${n?"cursor:pointer":"opacity:.5"}"><div class="top"><div class="nm">🎁 ${l}</div>${on?`<div class="pr">loopt nog</div>`:""}</div><div class="last">${n} sets${n?" · tik om je Wrapped te bekijken":""}</div></div>`}).join("")}
 function story(p){const r=rng(wy,p),anyP=S.e.filter(e=>inR(e,r)),inP=anyP.filter(e=>!e.rm&&e.kg!=null).sort((a,b)=>a.d.localeCompare(b.d)),on=today()>r[0]&&today()<r[1],sets=anyP.length,days=new Set(anyP.map(e=>e.d)).size,vol=inP.reduce((t,e)=>t+(e.kg>0?e.kg*e.r:0),0);
  const pv=p==3?[wy-1,3]:p==0?[wy-1,2]:[wy,p-1],pc=S.e.filter(e=>inR(e,rng(pv[0],pv[1]))).length;
+ const ses=(S.ss||[]).filter(e=>inR(e,r)),tm=ses.reduce((t,e)=>t+e.m,0);
  const cnt={};anyP.forEach(e=>cnt[e.x]=(cnt[e.x]||0)+1);const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,3);
  const bst={},prs=[];S.e.filter(e=>e.d&&!e.rm&&e.kg!=null).sort((a,b)=>a.d.localeCompare(b.d)).forEach(e=>{const o=bst[e.x];if(o&&better(e,o)&&inR(e,r))prs.push(e);if(!o||better(e,o))bst[e.x]=e});
  let prog=null;const g={};inP.forEach(e=>{(g[e.x]=g[e.x]||[]).push(e)});
@@ -168,6 +175,7 @@ function story(p){const r=rng(wy,p),anyP=S.e.filter(e=>inR(e,r)),inP=anyP.filter
  if(!sets)sl.push(`<div class="wbig2">Nog geen sets in deze periode</div>`);
  else{
   const df=sets-pc;sl.push(`<div class="wbig">${days}</div><div class="wsm">trainingsdagen<br>${sets} sets gelogd${pc?`<br>${df>=0?"+":""}${df} t.o.v. vorige periode`:""}</div>`);
+  if(ses.length)sl.push(`<div class="wbig">${Math.floor(tm/60)}u ${tm%60}m</div><div class="wsm">getraind in ${ses.length} trainingen</div>`);
   if(vol>0)sl.push(`<div class="wbig">${nf(vol)} kg</div><div class="wsm">totaal getild<br>(gewicht × reps) · ${(vol/1000).toFixed(1).replace(".",",")} ton</div>`);
   sl.push(`<div class="wsm">Je favoriete oefening</div><div class="wbig2">${top[0][0]}</div><div class="wsm">${top[0][1]} sets${top.length>1?"<br><br>"+top.slice(1).map((t,i)=>`${i+2}. ${t[0]} (${t[1]})`).join("<br>"):""}</div>`);
   sl.push(prs.length?`<div class="wbig">${prs.length}</div><div class="wsm">nieuwe PR's 🔥<br><br>${prs.slice(-5).reverse().map(e=>`${e.x}: ${e.kg} kg × ${e.r}`).join("<br>")}</div>`:`<div class="wbig2">Nog geen nieuwe PR's</div><div class="wsm">Dat komt vanzelf, blijf loggen 💪</div>`);
@@ -178,15 +186,39 @@ function story(p){const r=rng(wy,p),anyP=S.e.filter(e=>inR(e,r)),inP=anyP.filter
  draw();
  el.onclick=ev=>{if(ev.target.closest(".wx")){el.remove();return}if(ev.clientX<innerWidth/3){if(i>0)i--}else if(i<sl.length-1)i++;else{el.remove();return}draw()}}
 const isT=n=>n=="Plank"||(S.c||[]).some(c=>c.n==n&&c.t=="t");
+function prAll(){const b={},l=[];S.e.filter(e=>e.d&&!e.rm&&e.kg!=null).sort((x,y)=>x.d.localeCompare(y.d)).forEach(e=>{const o=b[e.x];if(o&&better(e,o))l.push(e);if(!o||better(e,o))b[e.x]=e});return l}
+const xpOf=()=>S.e.filter(e=>!e.rm).length*10+prAll().length*50+S.e.filter(e=>e.rm).length*50+new Set(S.e.filter(e=>e.d).map(e=>e.d)).size*20+(S.ss||[]).length*30;
+const thr=L=>100*L*(L-1),lvOf=x=>{let L=1;while(x>=thr(L+1))L++;return L};
+const TTL=["Beginner","Gym-rat","Ijzerslepper","Pump-held","Krachtpatser","Staalharde","Beest","Titan","Legende"],ttl=L=>TTL[Math.min(L-1,TTL.length-1)];
+const lvu=(xb,tp)=>{const a=lvOf(xpOf());if(a>lvOf(xb))tp.push("🎉 Level up! Level "+a+" · "+ttl(a))};
+function wkStreak(){const w=[...new Set(S.e.filter(e=>e.d).map(e=>{const[y,m,d]=e.d.split("-").map(Number);return Math.floor((Date.UTC(y,m-1,d)/86400000+3)/7)}))].sort((a,b)=>a-b);let b=0,c=0;w.forEach((x,i)=>{c=i&&x==w[i-1]+1?c+1:1;if(c>b)b=c});return b}
+function lvCard(){const x=xpOf(),L=lvOf(x),a=thr(L),b=thr(L+1),sets=S.e.filter(e=>!e.rm).length,days=new Set(S.e.filter(e=>e.d).map(e=>e.d)).size,pr=prAll().length,ws=wkStreak();
+ const bd=[["🔥","Eerste PR",pr>=1],["🏆","10 PR's",pr>=10],["💯","50 sets",sets>=50],["🎯","100 sets",sets>=100],["📅","10 trainingsdagen",days>=10],["🗓️","25 trainingsdagen",days>=25],["⚡","4 weken op rij",ws>=4]];
+ return `<div class="card"><div class="top"><div class="nm">Level ${L} · ${ttl(L)}</div><div class="pr">${x} XP</div></div><div class="bar"><i style="width:${Math.round((x-a)/(b-a)*100)}%"></i></div><div class="last">nog ${b-x} XP tot level ${L+1} · beste weekreeks: ${ws} wk</div><div class="bd">${bd.map(t=>`<span class="${t[2]?"":"off"}">${t[0]} ${t[1]}</span>`).join("")}</div></div>`}
+function sesCard(){const ss=(S.ss||[]).slice().sort((a,b)=>b.d.localeCompare(a.d));
+ if(!ss.length)return `<div class="card"><div class="nm">⏱ Trainingen</div><div class="last">Nog geen trainingen. Tik bovenaan op "Start training" en rond af met je energie en slaap.</div></div>`;
+ const tot=ss.reduce((t,e)=>t+e.m,0),vol=d=>S.e.filter(e=>e.d==d&&!e.rm&&e.kg>0).reduce((t,e)=>t+e.kg*e.r,0);
+ const ins=(k,l)=>{const g=ss.filter(e=>e[k]),hi=g.filter(e=>e[k]>=4),lo=g.filter(e=>e[k]<=3);if(hi.length<2||lo.length<2)return"";const av=a=>a.reduce((t,e)=>t+vol(e.d),0)/a.length;return `<div class="last">${l} 4-5: gem. ${nf(av(hi))} kg getild · ${l} 1-3: gem. ${nf(av(lo))} kg</div>`};
+ const i2=ins("en","Energie")+ins("sl","Slaap");
+ return `<div class="card"><div class="top"><div class="nm">⏱ Trainingen</div><div class="pr">${ss.length}× · ${Math.floor(tot/60)}u ${tot%60}m</div></div>${i2?i2+`<div class="last">Gemiddelden, geen bewijs.</div>`:""}<div class="hist">${ss.slice(0,5).map(e=>`<div><span>${fmt(e.d)}</span><span>${e.m} min${e.en?" · energie "+e.en+"/5":""}${e.sl?" · slaap "+e.sl+"/5":""}</span></div>`).join("")}</div></div>`}
+function warm(n,kg){const r=isDB(n)?1:2.5,w=p=>Math.max(r,Math.round(kg*p/r)*r);return `<div class="hist"><div><span><b>Opwarmen richting ${kg} kg</b></span></div>`+[[.5,8],[.7,5],[.85,3]].map(([p,rp])=>`<div><span>${Math.round(p*100)}%</span><span>${String(w(p)).replace(".",",")} kg × ${rp}</span></div>`).join("")+`</div>`}
+function tmDraw(){const e=$("#tm");if(!e)return;const st=localStorage.getItem("gt-start");e.innerHTML=user&&!pick?(st?`<button class="tmb on" data-te="1">⏹ Training afronden · <span id="tmt">0:00:00</span></button>`:`<button class="tmb" data-ts="1">▶ Start training</button>`):""}
+setInterval(()=>{const e=$("#tmt"),s=+localStorage.getItem("gt-start");if(e&&s){const q=Math.floor((Date.now()-s)/1000),z=n=>String(n).padStart(2,"0");e.textContent=Math.floor(q/3600)+":"+z(Math.floor(q/60)%60)+":"+z(q%60)}},1000);
+function finish(){const st=+localStorage.getItem("gt-start");if(!st)return;const m=Math.min(300,Math.max(1,Math.round((Date.now()-st)/60000))),el=document.createElement("div");el.id="sc";document.body.appendChild(el);const r={};
+ const draw=()=>{el.innerHTML=`<div class="card"><div class="nm">Training klaar · ${m} min 💪</div>`+[["en","Energie"],["sl","Slaap vannacht"]].map(([k,l])=>`<div class="last">${l}</div><div class="row">${[1,2,3,4,5].map(v=>`<button data-sc="${k}${v}" class="${r[k]==v?"p":""}">${["😫","😕","😐","🙂","💪"][v-1]}</button>`).join("")}</div>`).join("")+`<div class="row"><button data-sc="skip">Overslaan</button><button class="p" data-sc="ok">Opslaan</button></div></div>`};
+ draw();
+ el.onclick=ev=>{const b=ev.target.closest("[data-sc]");if(!b)return;const v=b.dataset.sc;
+  if(v=="skip"||v=="ok"){S.ss=S.ss||[];S.ss.push({d:today(),m,...(v=="ok"?r:{})});localStorage.removeItem("gt-start");save();el.remove();render();toast("Training opgeslagen ✓")}
+  else{r[v.slice(0,2)]=+v.slice(2);draw()}}}
 let ordering=false;
 function list(){const b=DAYS[tab].ex.filter(n=>!(S.h||[]).includes(n)).concat((S.c||[]).filter(c=>c.d==tab).map(c=>c.n)),o=(S.o||{})[tab]||[],p=a=>o.indexOf(a)<0?999+b.indexOf(a):o.indexOf(a);return b.slice().sort((x,y)=>p(x)-p(y))}
 function start(n){S.n=n;S.e=n=="Tygo"?seed():n=="Tim"?seed(SEEDT):[];pick=0;save();render()}
-function render(){if(!user){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Inloggen</div><form id="auth"><label class="w">E-mail<input name="m" type="email" required autocomplete="email"></label><label class="w">Wachtwoord (min. 6 tekens)<input name="p" type="password" minlength="6" required autocomplete="current-password"></label><button value="in">Inloggen</button><button value="new" style="background:var(--ac)">Account maken</button></form><div class="last">${authErr}</div></div>`;return}
+function render(){tmDraw();if(!user){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Inloggen</div><form id="auth"><label class="w">E-mail<input name="m" type="email" required autocomplete="email"></label><label class="w">Wachtwoord (min. 6 tekens)<input name="p" type="password" minlength="6" required autocomplete="current-password"></label><button value="in">Inloggen</button><button value="new" style="background:var(--ac)">Account maken</button></form><div class="last">${authErr}</div></div>`;return}
  if(pick){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Wie ben je?</div><div class="last">Kies je naam, dan start je met je eigen schema. Wat je logt blijft alleen van jou.</div><div class="row"><button class="p" data-s="Tygo">Tygo</button><button class="p" data-s="Tim">Tim</button></div></div>`;return}
- document.querySelector("h1").textContent="🏋️ Gym Tracker"+(S.n?" · "+S.n:"");$("#tabs").innerHTML=DAYS.map((d,i)=>`<button class="${i==tab?"on":""}" data-t="${i}">${d.t}</button>`).join("")+`<button class="${tab==4?"on":""}" data-t="4">🎁 Wrapped</button>`;
+ document.querySelector("h1").textContent="🏋️ Gym Tracker"+(S.n?" · "+S.n:"")+(user&&!pick?" · Lv "+lvOf(xpOf()):"");$("#tabs").innerHTML=DAYS.map((d,i)=>`<button class="${i==tab?"on":""}" data-t="${i}">${d.t}</button>`).join("")+`<button class="${tab==4?"on":""}" data-t="4">🎁 Wrapped</button>`;
  if(tab==4){$("#list").innerHTML=wview();return}
  $("#list").innerHTML=`<div class="bw">⚖️ Lichaamsgewicht <input id="bw" type="number" inputmode="decimal" step="any" value="${S.bw||""}"> kg</div><div class="row" style="margin-top:0"><button data-ord="1">${ordering?"✓ Klaar":"✎ Aanpassen"}</button></div>`+list().map(card).join("")+`<div class="card"><form id="addx"><label class="w">Eigen oefening toevoegen aan deze dag<input name="n" placeholder="bijv. Biceps Curl cable" required maxlength="40"></label><label class="w">Meten in<select name="t"><option value="kg">Gewicht × reps</option><option value="t">Tijd (bijv. plank, dead hang)</option></select></label><button>+ Toevoegen</button></form></div>`}
-document.addEventListener("click",ev=>{const t=ev.target;if(t.closest("#wr"))return;const wp=t.closest("[data-wp]");if(wp){story(+wp.dataset.wp);return}const wb=t.closest("[data-wy]");if(wb){wy=+wb.dataset.wy;render();return}
+document.addEventListener("click",ev=>{const t=ev.target;if(t.closest("#wr,#sc"))return;const wp=t.closest("[data-wp]");if(wp){story(+wp.dataset.wp);return}const wb=t.closest("[data-wy]");if(wb){wy=+wb.dataset.wy;render();return}
  if(t.id=="lo"){ev.preventDefault();signOut(auth)}
  else if(t.dataset.ord){ordering=!ordering;render()}
  else if(t.dataset.mv){const[n,d]=t.dataset.mv.split("|"),l=list(),i=l.indexOf(n),j=i+ +d;if(j>=0&&j<l.length){[l[i],l[j]]=[l[j],l[i]];S.o=S.o||{};S.o[tab]=l;save();render()}}
@@ -197,7 +229,11 @@ document.addEventListener("click",ev=>{const t=ev.target;if(t.closest("#wr"))ret
   if(!vis.some(a=>K(a)==K(n)))S.e=S.e.filter(e=>e.x!=K(n));save();render()}}
  else if(t.dataset.s){start(t.dataset.s)}
  else if(t.dataset.t!=null){tab=+t.dataset.t;render()}
- else if(t.dataset.same){const nm=t.dataset.same,x=K(nm),l=sets(x)[0];if(l){const n={id:uid(),x,d:today()};if(l.t)n.t=l.t;else{n.kg=l.kg;n.r=l.r;n.rm=0}S.e.push(n);save();render();const tp=tips(x,n);toast(["Zelfde als vorige keer opgeslagen ✓",...tp].join("\n"),tp.length?6000:2200)}}
+ else if(t.dataset.ts){localStorage.setItem("gt-start",Date.now());tmDraw();toast("Training gestart ⏱")}
+ else if(t.dataset.te){finish()}
+ else if(t.dataset.w){open[t.dataset.w]=open[t.dataset.w]=="w"?0:"w";render()}
+ else if(t.dataset.pn){const k=K(t.dataset.pn),v=prompt("Vaste notitie voor deze oefening (leeg = verwijderen)",(S.pn||{})[k]||"");if(v!==null){S.pn=S.pn||{};const c=v.replace(/["<>&]/g,"").trim();if(c)S.pn[k]=c;else delete S.pn[k];save();render()}}
+ else if(t.dataset.same){const nm=t.dataset.same,x=K(nm),l=sets(x)[0];if(l){const n={id:uid(),x,d:today()};if(l.t)n.t=l.t;else{n.kg=l.kg;n.r=l.r;n.rm=0}const xb=xpOf();S.e.push(n);save();render();const tp=tips(x,n);lvu(xb,tp);toast(["Zelfde als vorige keer opgeslagen ✓",...tp].join("\n"),tp.length?6000:2200)}}
  else if(t.dataset.f){open[t.dataset.f]=open[t.dataset.f]=="f"?0:"f";render()}
  else if(t.dataset.c){open[t.dataset.c]=open[t.dataset.c]=="c"?0:"c";render()}
  else if(t.dataset.h){open[t.dataset.h]=open[t.dataset.h]=="h"?0:"h";render()}
@@ -211,7 +247,7 @@ document.addEventListener("submit",async ev=>{ev.preventDefault();const f=ev.tar
  const n={id:uid(),x,d:v.d||today()};if(v.nt&&v.nt.trim())n.nt=v.nt.replace(/["<>&]/g,"").trim();let msg="Opgeslagen ✓";
  if(v.t)n.t=v.t.trim();else{n.kg=parseFloat(String(v.kg).replace(",","."));n.r=parseInt(v.r);n.rm=v.rm?1:0;
   if(n.rm)msg="Nieuwe 1RM opgeslagen 🏆";else{const b=best(x);if(b&&better(n,b))msg="Nieuw PR! 🔥"}}
-const ns=Math.max(1,Math.min(10,parseInt(v.ns)||1));S.e.push(n);if(!n.rm)for(let k=1;k<ns;k++)S.e.push({...n,id:uid()});
- open[nm]=0;save();render();const tp=n.rm?[]:tips(x,n);toast([msg+(ns>1&&!n.rm?" ("+ns+" sets)":""),...tp].join("\n"),tp.length?6000:2200)});
+const ns=Math.max(1,Math.min(10,parseInt(v.ns)||1)),xb=xpOf();S.e.push(n);if(!n.rm)for(let k=1;k<ns;k++)S.e.push({...n,id:uid()});
+ open[nm]=0;save();render();const tp=n.rm?[]:tips(x,n);lvu(xb,tp);toast([msg+(ns>1&&!n.rm?" ("+ns+" sets)":""),...tp].join("\n"),tp.length?6000:2200)});
 document.addEventListener("change",ev=>{if(ev.target.id=="bw"){S.bw=parseFloat(String(ev.target.value).replace(",","."))||0;save();render();toast("Lichaamsgewicht opgeslagen ✓")}});
 </script></body></html>
