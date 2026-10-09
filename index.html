@@ -187,8 +187,8 @@ function story(p){const r=rng(wy,p),anyP=S.e.filter(e=>inR(e,r)),inP=anyP.filter
  el.onclick=ev=>{if(ev.target.closest(".wx")){el.remove();return}if(ev.clientX<innerWidth/3){if(i>0)i--}else if(i<sl.length-1)i++;else{el.remove();return}draw()}}
 const isT=n=>n=="Plank"||(S.c||[]).some(c=>c.n==n&&c.t=="t");
 function prAll(){const b={},l=[];S.e.filter(e=>e.d&&!e.rm&&e.kg!=null).sort((x,y)=>x.d.localeCompare(y.d)).forEach(e=>{const o=b[e.x];if(o&&better(e,o))l.push(e);if(!o||better(e,o))b[e.x]=e});return l}
-const xpOf=()=>S.e.filter(e=>!e.rm).length*10+prAll().length*50+S.e.filter(e=>e.rm).length*50+new Set(S.e.filter(e=>e.d).map(e=>e.d)).size*20+(S.ss||[]).length*30;
-const thr=L=>100*L*(L-1),lvOf=x=>{let L=1;while(x>=thr(L+1))L++;return L};
+const xpOf=()=>S.e.filter(e=>!e.rm).length*5+prAll().length*25+S.e.filter(e=>e.rm).length*25+new Set(S.e.filter(e=>e.d).map(e=>e.d)).size*10+(S.ss||[]).length*15;
+const thr=L=>200*L*(L-1),lvOf=x=>{let L=1;while(x>=thr(L+1))L++;return L};
 const TTL=["Beginner","Gym-rat","Ijzerslepper","Pump-held","Krachtpatser","Staalharde","Beest","Titan","Legende"],ttl=L=>TTL[Math.min(L-1,TTL.length-1)];
 const lvu=(xb,tp)=>{const a=lvOf(xpOf());if(a>lvOf(xb))tp.push("🎉 Level up! Level "+a+" · "+ttl(a))};
 function wkStreak(){const w=[...new Set(S.e.filter(e=>e.d).map(e=>{const[y,m,d]=e.d.split("-").map(Number);return Math.floor((Date.UTC(y,m-1,d)/86400000+3)/7)}))].sort((a,b)=>a-b);let b=0,c=0;w.forEach((x,i)=>{c=i&&x==w[i-1]+1?c+1:1;if(c>b)b=c});return b}
