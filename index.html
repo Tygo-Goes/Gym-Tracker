@@ -34,6 +34,10 @@ form button{grid-column:1/3;background:var(--ok);color:#fff;border:0;border-radi
 .ch{margin-top:10px}.ch svg{width:100%;height:auto;display:block}.ch .t{font-size:11px;fill:var(--mu)}.ch .v{font-size:12px;fill:var(--tx);font-weight:600}.ch p{font-size:12px;color:var(--mu);margin:4px 0 0}
 .mv button{border:1px solid var(--ln);background:transparent;color:var(--tx);border-radius:8px;padding:4px 11px;margin-left:4px;font-size:14px}
 .bw{display:flex;align-items:center;gap:8px;margin:2px 4px 8px;color:var(--mu);font-size:14px}.bw input{width:80px;font-size:16px;padding:7px;border:1px solid var(--ln);border-radius:9px;background:var(--card);color:var(--tx)}
+#wr{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:center;padding:28px;color:#fff;text-align:center;user-select:none}
+.wb{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:14px;right:14px;display:flex;gap:4px}.wb i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.35)}.wb i.on{background:#fff}
+.wx{position:absolute;top:calc(26px + env(safe-area-inset-top,0px));right:14px;background:none;border:0;color:#fff;font-size:22px;padding:8px}
+.wbig{font-size:68px;font-weight:800;line-height:1.05}.wbig2{font-size:34px;font-weight:800;line-height:1.15}.wsm{font-size:19px;opacity:.92;margin-top:12px;line-height:1.5}
 .hist{margin-top:8px;font-size:14px}
 .hist div{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--ln)}
 .hist i{font-style:normal;color:var(--mu)}
@@ -141,14 +145,41 @@ function card(nm){const x=K(nm),h=sets(x),rm=S.e.filter(e=>e.x==x&&e.rm).sort((a
  const cs=o=="c"?chart(x):"",hs=o=="h"?`<div class="hist">`+S.e.filter(e=>e.x==x).sort((a,b)=>(b.d||"").localeCompare(a.d||"")).map(e=>`<div><span>${fmt(e.d)}</span><span>${e.t||e.kg+" kg × "+e.r}${e.rm?" <b>1RM</b>":""}${e.nt?`<br><i>${e.nt}</i>`:""}</span><button data-del="${e.id}" aria-label="Verwijder">✕</button></div>`).join("")+`</div>`:"";
  return `<div class="card"><div class="top"><div class="nm">${nm}</div>${pr?`<div class="pr">${pr}</div>`:""}${ordering?`<span class="mv"><button data-mv="${nm}|-1">▲</button><button data-mv="${nm}|1">▼</button><button data-xd="${nm}" aria-label="Verwijder oefening">✕</button></span>`:""}</div><div class="last">${last}</div>${est?`<div class="last">${est}</div>`:""}${sug?`<div class="last">💡 Volgende keer: ${sug}</div>`:""}
  <div class="row"><button class="p" data-f="${nm}">+ Set</button><button data-h="${nm}">Historie (${S.e.filter(e=>e.x==x).length})</button>${plank?"":`<button data-c="${nm}">📈</button>`}</div>${f}${cs}${hs}</div>`}
+let wy=new Date().getFullYear();
+const WL=["Jan – apr","Mei – aug","Sep – dec","Heel jaar"],nf=n=>Math.round(n).toLocaleString("nl-NL"),WG=["#e8590c,#f59f00","#7048e8,#e64980","#1971c2,#12b886","#c2255c,#f76707","#2b8a3e,#94d82d","#5f3dc4,#1c7ed6","#e8590c,#c2255c"];
+const rng=(y,p)=>{const a=p==3?1:p*4+1,b=p==3?12:p*4+4,z=n=>String(n).padStart(2,"0");return[y+"-"+z(a)+"-00",y+"-"+z(b)+"-32"]};
+const inR=(e,r)=>e.d&&e.d>r[0]&&e.d<r[1];
+function wview(){const ys=[...new Set(S.e.map(e=>e.d&&+e.d.slice(0,4)).filter(Boolean).concat(new Date().getFullYear()))].sort();
+ return `<div class="row" style="margin-top:0">${ys.map(y=>`<button data-wy="${y}" class="${y==wy?"p":""}">${y}</button>`).join("")}</div>`+WL.map((l,p)=>{const r=rng(wy,p),n=S.e.filter(e=>inR(e,r)).length,on=today()>r[0]&&today()<r[1];
+  return `<div class="card" data-wp="${p}" style="${n?"cursor:pointer":"opacity:.5"}"><div class="top"><div class="nm">🎁 ${l}</div>${on?`<div class="pr">loopt nog</div>`:""}</div><div class="last">${n} sets${n?" · tik om je Wrapped te bekijken":""}</div></div>`}).join("")}
+function story(p){const r=rng(wy,p),anyP=S.e.filter(e=>inR(e,r)),inP=anyP.filter(e=>!e.rm&&e.kg!=null).sort((a,b)=>a.d.localeCompare(b.d)),on=today()>r[0]&&today()<r[1],sets=anyP.length,days=new Set(anyP.map(e=>e.d)).size,vol=inP.reduce((t,e)=>t+(e.kg>0?e.kg*e.r:0),0);
+ const pv=p==3?[wy-1,3]:p==0?[wy-1,2]:[wy,p-1],pc=S.e.filter(e=>inR(e,rng(pv[0],pv[1]))).length;
+ const cnt={};anyP.forEach(e=>cnt[e.x]=(cnt[e.x]||0)+1);const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,3);
+ const bst={},prs=[];S.e.filter(e=>e.d&&!e.rm&&e.kg!=null).sort((a,b)=>a.d.localeCompare(b.d)).forEach(e=>{const o=bst[e.x];if(o&&better(e,o)&&inR(e,r))prs.push(e);if(!o||better(e,o))bst[e.x]=e});
+ let prog=null;const g={};inP.forEach(e=>{(g[e.x]=g[e.x]||[]).push(e)});
+ for(const x in g){const a=g[x];if(a.length<2||!(a[0].kg>0))continue;const b=a.reduce((m,e)=>better(e,m)?e:m),pct=(b.kg-a[0].kg)/a[0].kg*100;if(pct>0&&(!prog||pct>prog.pct))prog={x,from:a[0].kg,to:b.kg,pct}}
+ const sl=[`<div class="wbig">🎁</div><div class="wsm">Jouw Wrapped<br><b>${WL[p]} ${wy}</b>${on?"<br>tot nu toe":""}</div>`];
+ if(!sets)sl.push(`<div class="wbig2">Nog geen sets in deze periode</div>`);
+ else{
+  const df=sets-pc;sl.push(`<div class="wbig">${days}</div><div class="wsm">trainingsdagen<br>${sets} sets gelogd${pc?`<br>${df>=0?"+":""}${df} t.o.v. vorige periode`:""}</div>`);
+  if(vol>0)sl.push(`<div class="wbig">${nf(vol)} kg</div><div class="wsm">totaal getild<br>(gewicht × reps) · ${(vol/1000).toFixed(1).replace(".",",")} ton</div>`);
+  sl.push(`<div class="wsm">Je favoriete oefening</div><div class="wbig2">${top[0][0]}</div><div class="wsm">${top[0][1]} sets${top.length>1?"<br><br>"+top.slice(1).map((t,i)=>`${i+2}. ${t[0]} (${t[1]})`).join("<br>"):""}</div>`);
+  sl.push(prs.length?`<div class="wbig">${prs.length}</div><div class="wsm">nieuwe PR's 🔥<br><br>${prs.slice(-5).reverse().map(e=>`${e.x}: ${e.kg} kg × ${e.r}`).join("<br>")}</div>`:`<div class="wbig2">Nog geen nieuwe PR's</div><div class="wsm">Dat komt vanzelf, blijf loggen 💪</div>`);
+  if(prog)sl.push(`<div class="wsm">Grootste sprong</div><div class="wbig2">${prog.x}</div><div class="wsm">${prog.from} → ${prog.to} kg<br><b>+${Math.round(prog.pct)}%</b></div>`);
+  sl.push(`<div class="wbig2">${WL[p]} ${wy}</div><div class="wsm">${days} dagen · ${sets} sets<br>${vol>0?nf(vol)+" kg getild<br>":""}${prs.length} nieuwe PR's<br><br>Blijven gaan 💪</div>`)}
+ let i=0;const el=document.createElement("div");el.id="wr";document.body.appendChild(el);
+ const draw=()=>{const c=WG[i%WG.length].split(",");el.style.background=`linear-gradient(160deg,${c[0]},${c[1]})`;el.innerHTML=`<div class="wb">${sl.map((_,k)=>`<i class="${k<=i?"on":""}"></i>`).join("")}</div><button class="wx" aria-label="Sluiten">✕</button>`+sl[i]};
+ draw();
+ el.onclick=ev=>{if(ev.target.closest(".wx")){el.remove();return}if(ev.clientX<innerWidth/3){if(i>0)i--}else if(i<sl.length-1)i++;else{el.remove();return}draw()}}
 let ordering=false;
 function list(){const b=DAYS[tab].ex.filter(n=>!(S.h||[]).includes(n)).concat((S.c||[]).filter(c=>c.d==tab).map(c=>c.n)),o=(S.o||{})[tab]||[],p=a=>o.indexOf(a)<0?999+b.indexOf(a):o.indexOf(a);return b.slice().sort((x,y)=>p(x)-p(y))}
 function start(n){S.n=n;S.e=n=="Tygo"?seed():n=="Tim"?seed(SEEDT):[];pick=0;save();render()}
 function render(){if(!user){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Inloggen</div><form id="auth"><label class="w">E-mail<input name="m" type="email" required autocomplete="email"></label><label class="w">Wachtwoord (min. 6 tekens)<input name="p" type="password" minlength="6" required autocomplete="current-password"></label><button value="in">Inloggen</button><button value="new" style="background:var(--ac)">Account maken</button></form><div class="last">${authErr}</div></div>`;return}
  if(pick){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Wie ben je?</div><div class="last">Kies je naam, dan start je met je eigen schema. Wat je logt blijft alleen van jou.</div><div class="row"><button class="p" data-s="Tygo">Tygo</button><button class="p" data-s="Tim">Tim</button></div></div>`;return}
- document.querySelector("h1").textContent="🏋️ Gym Tracker"+(S.n?" · "+S.n:"");$("#tabs").innerHTML=DAYS.map((d,i)=>`<button class="${i==tab?"on":""}" data-t="${i}">${d.t}</button>`).join("");
+ document.querySelector("h1").textContent="🏋️ Gym Tracker"+(S.n?" · "+S.n:"");$("#tabs").innerHTML=DAYS.map((d,i)=>`<button class="${i==tab?"on":""}" data-t="${i}">${d.t}</button>`).join("")+`<button class="${tab==4?"on":""}" data-t="4">🎁 Wrapped</button>`;
+ if(tab==4){$("#list").innerHTML=wview();return}
  $("#list").innerHTML=`<div class="bw">⚖️ Lichaamsgewicht <input id="bw" type="number" inputmode="decimal" step="any" value="${S.bw||""}"> kg</div><div class="row" style="margin-top:0"><button data-ord="1">${ordering?"✓ Klaar":"✎ Aanpassen"}</button></div>`+list().map(card).join("")+`<div class="card"><form id="addx"><label class="w">Eigen oefening toevoegen aan deze dag<input name="n" placeholder="bijv. Biceps Curl cable" required maxlength="40"></label><button>+ Toevoegen</button></form></div>`}
-document.addEventListener("click",ev=>{const t=ev.target;
+document.addEventListener("click",ev=>{const t=ev.target;if(t.closest("#wr"))return;const wp=t.closest("[data-wp]");if(wp){story(+wp.dataset.wp);return}const wb=t.closest("[data-wy]");if(wb){wy=+wb.dataset.wy;render();return}
  if(t.id=="lo"){ev.preventDefault();signOut(auth)}
  else if(t.dataset.ord){ordering=!ordering;render()}
  else if(t.dataset.mv){const[n,d]=t.dataset.mv.split("|"),l=list(),i=l.indexOf(n),j=i+ +d;if(j>=0&&j<l.length){[l[i],l[j]]=[l[j],l[i]];S.o=S.o||{};S.o[tab]=l;save();render()}}
