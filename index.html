@@ -61,7 +61,7 @@ form button{grid-column:1/3;background:var(--ok);color:#fff;border:0;border-radi
 </main><div id="toast"></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {getFirestore,doc,getDoc,setDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {firebaseConfig} from "./firebase-config.js";
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
@@ -71,54 +71,12 @@ const DAYS=[
 {t:"2 · Push",ex:["Cable Tricep Pushdown","Pec Fly","Flat Bench Press","Shoulder Press dumbbells","Lateral Raise dumbbell"]},
 {t:"3 · Core",ex:["Crunches","Rotary Torso","Plank"]},
 {t:"4 · Core + Legs",ex:["Leg Press (plates)","Seated Calf Raises","Leg Curl","Back Extension","Abductor","Adductor","Ab Crunch","Ab Rotary Machine","Captains Chair"]}];
-const SEED={"Preacher Curl dumbbell":[["27-08",59,8],["07-09",63,7],["28-09",16,6],["02-10",16,7],["05-10",18,6]],
-"Rear Delt Fly":[["27-08",52,7],["07-09",59,11],["18-09",59,6],["02-10",66,6]],
-"Hammer Curl dumbbell":[["27-08",12,8],["28-09",14,10],["02-10",16,8]],
-"Seated Row cable":[["18-09",36,6]],
-"Wide grip Lat Pulldown":[["27-08",52,7],["07-09",39,7]],
-"Cable Wrist Curl":[["27-08",73,7],["18-09",91,8],["28-09",91,10]],
-"Cable Tricep Pushdown":[["28-08",50,8],["25-09",68,7],["30-09",73,6]],
-"Pec Fly":[["28-08",59,6],["25-09",73,9],["30-09",86,9],["05-10",93,6]],
-"Flat Bench Press":[["25-09",60,8],["30-09",70,6],["05-10",70,7],["",75,1,1]],
-"Shoulder Press dumbbells":[["28-08",14,7],["25-09",14,7],["30-09",16,7],["05-10",16,9]],
-"Lateral Raise dumbbell":[["28-08",7,6],["25-09",7,10],["30-09",10,7],["05-10",10,8]],
-"Crunches":[["02-10",64,9]],"Rotary Torso":[["02-10",64,11]],
-"Plank":[["02-10","2:25 + 1:30"]],
-"Leg Press (plates)":[["28-08",120,12],["21-09",180,7]],
-"Seated Calf Raises":[["28-08",134,10],["21-09",134,14]],
-"Leg Curl":[["28-08",68.3,9],["21-09",68.3,9]],
-"Back Extension":[["28-08",93,8],["21-09",100,8]],
-"Abductor":[["28-08",66,8],["21-09",66,9]],
-"Adductor":[["28-08",73,9],["21-09",79,7]],
-"Ab Crunch":[["28-08",50,9],["21-09",50,9],["25-09",54,10]],
-"Ab Rotary Machine":[["28-08",36,8]],
-"Captains Chair":[["25-09",0,14]]};
-const SEEDT={"Preacher Curl dumbbell":[["02-10",8,7]],
-"Rear Delt Fly":[["28-09",32,6],["02-10",32,8]],
-"Hammer Curl dumbbell":[["28-09",8,6],["02-10",8,8]],
-"Seated Row cable":[["02-10",32,8]],
-"Cable Wrist Curl":[["27-08",73,7],["18-09",93,8]],
-"Cable Tricep Pushdown":[["25-09",36,7],["30-09",32,7],["05-10",32,8]],
-"Flat Bench Press":[["25-09",15,5],["30-09",20,7],["05-10",30,5]],
-"Pec Fly":[["25-09",45,7],["30-09",52,6],["05-10",52,7]],
-"Shoulder Press dumbbells":[["26-09",10,9],["30-09",10,9],["05-10",12,6]],
-"Lateral Raise dumbbell":[["25-09",6,8],["30-09",6,8],["05-10",7,7]],
-"Leg Press (plates)":[["28-08",120,12],["21-09",180,7]],
-"Seated Calf Raises":[["28-08",134,10],["21-09",134,14]],
-"Leg Curl":[["28-08",68.3,9],["21-09",68.3,9]],
-"Back Extension":[["28-08",93,8],["21-09",100,8]],
-"Abductor":[["28-08",66,8],["21-09",66,9]],
-"Adductor":[["28-08",73,9],["21-09",79,7]],
-"Ab Crunch":[["28-08",32,10],["21-09",32,10]],
-"Ab Rotary Machine":[["28-08",32,8]]};
 const AL={'Ab Crunch':'Crunches','Ab Rotary Machine':'Rotary Torso'},K=x=>AL[x]||x;
 const $=s=>document.querySelector(s);
 let S={e:[]},pick=0,tab=0,open={},ref=null,LS="gymtracker-v1";
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const fmt=d=>d?d.slice(8)+"-"+d.slice(5,7)+"-"+d.slice(2,4):"datum onbekend";
 const uid=()=>Math.random().toString(36).slice(2,9);
-function seed(src=SEED){const e=[];for(const k in src)for(const r of src[k]){const d=r[0]?"2026-"+r[0].split("-").reverse().join("-"):"";
- e.push(typeof r[1]=="string"?{id:uid(),x:K(k),d,t:r[1]}:{id:uid(),x:K(k),d,kg:r[1],r:r[2],rm:r[3]?1:0});}return e}
 let tt;function toast(m,ms=2200){const t=$("#toast");t.textContent=m;t.className="s";clearTimeout(tt);tt=setTimeout(()=>t.className="",ms)}
 const isDB=n=>/dum+b+e+l|\bdb\b/i.test(n),isBench=n=>/bench/i.test(n);
 const nextKg=(n,k)=>isDB(n)?(k>=10?k+2:Math.floor(k)+1):isBench(n)?k+2.5:null;
@@ -129,7 +87,6 @@ let saveT,user=null,authErr="";
 function save(){if(!ref)return;clearTimeout(saveT);saveT=setTimeout(async()=>{try{await setDoc(ref,{e:S.e,n:S.n||"",c:S.c||[],o:S.o||{},h:S.h||[],bw:S.bw||0,ss:S.ss||[],pn:S.pn||{}})}catch(e){toast("Opslaan mislukt")}},300)}
 onAuthStateChanged(auth,async u=>{user=u;ref=null;S={e:[],c:[],o:{},h:[],bw:0,ss:[],pn:{}};pick=0;
  if(u){const r=doc(db,"users",u.uid);try{const sn=await getDoc(r);ref=r;if(sn.exists()){S.e=sn.data().e||[];S.n=sn.data().n||"";S.c=sn.data().c||[];S.o=sn.data().o||{};S.h=sn.data().h||[];S.bw=sn.data().bw||0;S.ss=sn.data().ss||[];S.pn=sn.data().pn||{}}else pick=1}catch(e){toast("Laden mislukt, ververs de pagina")}
-  if(ref&&S.n=="Tim"&&!S.e.length&&!S.c.length){S.e=seed(SEEDT);save()}
   let mg=0;S.e.forEach(e=>{if(AL[e.x]){e.x=AL[e.x];mg=1}});if(mg)save()}
  $("#foot").innerHTML=u?`${u.email} · <a href="#" id="lo">uitloggen</a>`:"";render()});
 const sets=x=>S.e.filter(e=>e.x==x&&!e.rm).sort((a,b)=>(b.d||"").localeCompare(a.d||""));
@@ -212,9 +169,9 @@ function finish(){const st=+localStorage.getItem("gt-start");if(!st)return;const
   else{r[v.slice(0,2)]=+v.slice(2);draw()}}}
 let ordering=false;
 function list(){const b=DAYS[tab].ex.filter(n=>!(S.h||[]).includes(n)).concat((S.c||[]).filter(c=>c.d==tab).map(c=>c.n)),o=(S.o||{})[tab]||[],p=a=>o.indexOf(a)<0?999+b.indexOf(a):o.indexOf(a);return b.slice().sort((x,y)=>p(x)-p(y))}
-function start(n){S.n=n;S.e=n=="Tygo"?seed():n=="Tim"?seed(SEEDT):[];pick=0;save();render()}
-function render(){tmDraw();if(!user){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Inloggen</div><form id="auth"><label class="w">E-mail<input name="m" type="email" required autocomplete="email"></label><label class="w">Wachtwoord (min. 6 tekens)<input name="p" type="password" minlength="6" required autocomplete="current-password"></label><button value="in">Inloggen</button><button value="new" style="background:var(--ac)">Account maken</button></form><div class="last">${authErr}</div></div>`;return}
- if(pick){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Wie ben je?</div><div class="last">Kies je naam, dan start je met je eigen schema. Wat je logt blijft alleen van jou.</div><div class="row"><button class="p" data-s="Tygo">Tygo</button><button class="p" data-s="Tim">Tim</button></div></div>`;return}
+function start(n){S.n=n;S.e=[];pick=0;save();render()}
+function render(){tmDraw();if(!user){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Inloggen</div><form id="auth"><label class="w">E-mail<input name="m" type="email" required autocomplete="email"></label><label class="w">Wachtwoord (min. 6 tekens)<input name="p" type="password" minlength="6" required autocomplete="current-password"></label><button value="in">Inloggen</button><button value="new" style="background:var(--ac)">Account maken</button><button type="button" data-pw="1" style="background:none;color:var(--mu);font-size:14px">Wachtwoord vergeten?</button></form><div class="last">${authErr}</div></div>`;return}
+ if(pick){$("#tabs").innerHTML="";$("#list").innerHTML=`<div class="card"><div class="nm">Welkom! 👋</div><div class="last">Je begint met een leeg schema. Wat je logt blijft alleen van jou.</div><form id="nm"><label class="w">Hoe heet je?<input name="n" required maxlength="20" autocomplete="given-name"></label><button>Start</button></form></div>`;return}
  document.querySelector("h1").textContent="🏋️ Gym Tracker"+(S.n?" · "+S.n:"")+(user&&!pick?" · Lv "+lvOf(xpOf()):"");$("#tabs").innerHTML=DAYS.map((d,i)=>`<button class="${i==tab?"on":""}" data-t="${i}">${d.t}</button>`).join("")+`<button class="${tab==4?"on":""}" data-t="4">🎁 Wrapped</button>`;
  if(tab==4){$("#list").innerHTML=wview();return}
  $("#list").innerHTML=`<div class="bw">⚖️ Lichaamsgewicht <input id="bw" type="number" inputmode="decimal" step="any" value="${S.bw||""}"> kg</div><div class="row" style="margin-top:0"><button data-ord="1">${ordering?"✓ Klaar":"✎ Aanpassen"}</button></div>`+list().map(card).join("")+`<div class="card"><form id="addx"><label class="w">Eigen oefening toevoegen aan deze dag<input name="n" placeholder="bijv. Biceps Curl cable" required maxlength="40"></label><label class="w">Meten in<select name="t"><option value="kg">Gewicht × reps</option><option value="t">Tijd (bijv. plank, dead hang)</option></select></label><button>+ Toevoegen</button></form></div>`}
@@ -227,7 +184,7 @@ document.addEventListener("click",ev=>{const t=ev.target;if(t.closest("#wr,#sc")
   if((S.c||[]).some(c=>c.n==n))S.c=S.c.filter(c=>c.n!=n);else S.h=(S.h||[]).concat(n);
   const vis=DAYS.flatMap(d=>d.ex).filter(a=>!(S.h||[]).includes(a)).concat((S.c||[]).map(c=>c.n));
   if(!vis.some(a=>K(a)==K(n)))S.e=S.e.filter(e=>e.x!=K(n));save();render()}}
- else if(t.dataset.s){start(t.dataset.s)}
+ else if(t.dataset.pw){const m=document.querySelector("#auth [name=m]").value.trim();if(!m)toast("Vul eerst je e-mail in");else sendPasswordResetEmail(auth,m).then(()=>toast("Mail om je wachtwoord te herstellen verstuurd (check ook spam)"),()=>toast("Versturen mislukt"))}
  else if(t.dataset.t!=null){tab=+t.dataset.t;render()}
  else if(t.dataset.ts){localStorage.setItem("gt-start",Date.now());tmDraw();toast("Training gestart ⏱")}
  else if(t.dataset.te){finish()}
@@ -240,9 +197,10 @@ document.addEventListener("click",ev=>{const t=ev.target;if(t.closest("#wr,#sc")
  else if(t.dataset.del&&confirm("Deze set verwijderen?")){S.e=S.e.filter(e=>e.id!=t.dataset.del);save();render()}});
 document.addEventListener("submit",async ev=>{ev.preventDefault();const f=ev.target;
  if(f.id=="auth"){const v=Object.fromEntries(new FormData(f));authErr="";try{await(ev.submitter.value=="new"?createUserWithEmailAndPassword:signInWithEmailAndPassword)(auth,v.m,v.p)}catch(e){authErr="Mislukt ("+e.code.replace("auth/","")+")";render()}return}
- if(f.id=="addx"){const n=f.n.value.replace(/["<>&\\]/g,"").trim();const all=DAYS.flatMap(d=>d.ex).filter(a=>!(S.h||[]).includes(a)).concat((S.c||[]).map(c=>c.n));
+ if(f.id=="nm"){const n=f.elements.n.value.replace(/["<>&\\]/g,"").trim();if(n)start(n);return}
+ if(f.id=="addx"){const n=f.elements.n.value.replace(/["<>&\\]/g,"").trim();const all=DAYS.flatMap(d=>d.ex).filter(a=>!(S.h||[]).includes(a)).concat((S.c||[]).map(c=>c.n));
   if(!n)return;if(all.some(a=>a.toLowerCase()==n.toLowerCase())){toast("Die oefening bestaat al");return}
-  S.c=S.c||[];S.c.push({n,d:tab,t:f.t.value});save();render();toast("Oefening toegevoegd ✓");return}
+  S.c=S.c||[];S.c.push({n,d:tab,t:f.elements.t.value});save();render();toast("Oefening toegevoegd ✓");return}
  const nm=f.dataset.x,x=K(nm),v=Object.fromEntries(new FormData(f));
  const n={id:uid(),x,d:v.d||today()};if(v.nt&&v.nt.trim())n.nt=v.nt.replace(/["<>&]/g,"").trim();let msg="Opgeslagen ✓";
  if(v.t)n.t=v.t.trim();else{n.kg=parseFloat(String(v.kg).replace(",","."));n.r=parseInt(v.r);n.rm=v.rm?1:0;
