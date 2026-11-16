@@ -9,25 +9,30 @@ export const ranks = [
   {name:"Legend", color:"#d5fa64"}
 ];
 
-const milestones = [1, 1.4, 1.8, 2.25, 2.75, 3.3, 4];
+const freeWeightMilestones = [1, 1.45, 1.95, 2.5, 3.15, 3.8, 4.5];
+const machineMilestones = [1, 1.6, 2.2, 3.05, 4.1, 5.4, 7];
+const exerciseName = name => {
+  const normalized = String(name ?? "").trim().replace(/\s+/g," ").toLowerCase();
+  return normalized === "cable wirst curl" ? "cable wrist curl" : normalized;
+};
 const reference = (exercise, bronze, equipment="machine") => ({exercise, bronze, equipment});
 
 // Each position marks the visible muscle on its front or rear image.
 export const muscles = [
   {id:"chest", name:"Borst", points:{front:[58,23]}, exercises:[reference("Flat Bench Press",.50,"barbell"),reference("Pec Fly",.27)]},
   {id:"shoulders", name:"Schouders", points:{front:[32,20],back:[68,21]}, exercises:[reference("Shoulder Press dumbbells",.15,"dumbbell"),reference("Rear Delt Fly",.19),reference("Lateral Raise dumbbell",.075,"dumbbell")]},
-  {id:"biceps", name:"Biceps", points:{front:[71,28]}, exercises:[reference("Preacher Curl dumbbell",.10,"dumbbell"),reference("Hammer Curl dumbbell",.105,"dumbbell")]},
-  {id:"forearms", name:"Onderarmen", points:{front:[21,36]}, exercises:[reference("Cable Wrist Curl",.085)]},
+  {id:"biceps", name:"Biceps en elleboogbuigers", points:{front:[71,28]}, exercises:[reference("Preacher Curl dumbbell",.10,"dumbbell"),reference("Hammer Curl dumbbell",.105,"dumbbell")]},
+  {id:"forearms", name:"Onderarmflexoren", points:{front:[21,36]}, exercises:[reference("Cable Wrist Curl",.26)]},
   {id:"abs", name:"Buik", points:{front:[49,31]}, exercises:[reference("Crunches",.20)]},
   {id:"obliques", name:"Schuine buik", points:{front:[60,38]}, exercises:[reference("Rotary Torso",.20)]},
-  {id:"quads", name:"Bovenbenen", points:{front:[60,60]}, exercises:[reference("Leg Press (plates)",.75)]},
+  {id:"quads", name:"Quadriceps", points:{front:[60,60]}, exercises:[reference("Leg Press (plates)",.75)]},
   {id:"adductors", name:"Binnenkant benen", points:{front:[43,55]}, exercises:[reference("Adductor",.30)]},
-  {id:"back", name:"Bovenrug", points:{back:[44,26]}, exercises:[reference("Seated Row cable",.35),reference("Wide grip Lat Pulldown",.38)]},
+  {id:"back", name:"Bovenrug en lats", points:{back:[44,26]}, exercises:[reference("Seated Row cable",.35),reference("Wide grip Lat Pulldown",.38)]},
   {id:"triceps", name:"Triceps", points:{back:[27,30]}, exercises:[reference("Cable Tricep Pushdown",.18)]},
-  {id:"lowerBack", name:"Onderrug", points:{back:[50,37]}, exercises:[reference("Back Extension",.13,"extra")]},
-  {id:"glutes", name:"Bilspieren", points:{back:[42,45]}, exercises:[reference("Abductor",.32)]},
+  {id:"lowerBack", name:"Rugstrekkers", points:{back:[50,37]}, note:"Back Extension belast ook de billen en hamstrings. De verdeling hangt af van de uitvoering. De score gebruikt het gelogde extra gewicht.", exercises:[reference("Back Extension",.13,"extra")]},
+  {id:"glutes", name:"Heupabductoren", points:{back:[37,44]}, note:"Deze score hoort bij de spieren aan de buitenkant van je heup, waaronder de middelste en kleine bilspier.", exercises:[reference("Abductor",.32)]},
   {id:"hamstrings", name:"Hamstrings", points:{back:[60,57]}, exercises:[reference("Leg Curl",.27)]},
-  {id:"calves", name:"Kuiten", points:{back:[38,75]}, exercises:[reference("Seated Calf Raises",.30)]}
+  {id:"calves", name:"Kuiten", points:{back:[38,75]}, note:"Deze score komt van zittende calf raises, met nadruk op de diepe kuitspier (soleus).", exercises:[reference("Seated Calf Raises",.30)]}
 ];
 
 // Region outlines are drawn in the artwork's 440 × 822 coordinate space.
@@ -48,7 +53,7 @@ const bodyRegions = {
     back:{pair:true, outline:[[218,136],[202,134],[179,139],[170,156],[170,176],[152,193],[148,211],[149,235],[158,259],[168,282],[180,293],[193,280],[204,253],[217,232]]},
     triceps:{pair:true, outline:[[147,192],[131,199],[115,208],[105,231],[100,251],[101,270],[114,274],[127,254],[140,230],[148,207]]},
     lowerBack:{pair:false, outline:[[182,291],[196,279],[208,251],[220,233],[232,251],[244,279],[258,291],[274,300],[282,322],[263,324],[242,322],[220,321],[198,322],[174,324],[158,322],[165,300]]},
-    glutes:{pair:true, outline:[[160,342],[183,340],[207,341],[219,344],[219,384],[210,396],[192,404],[168,401],[146,391],[150,370]]},
+    glutes:{pair:true, outline:[[159,339],[176,339],[191,343],[189,355],[181,370],[169,385],[153,387],[147,380],[151,361]]},
     hamstrings:{pair:true, outline:[[138,437],[164,440],[190,446],[213,449],[206,476],[197,501],[187,530],[174,551],[160,559],[146,546],[140,524],[137,495]]},
     calves:{pair:true, outline:[[147,563],[159,557],[175,561],[184,579],[186,604],[180,634],[169,662],[156,681],[142,672],[133,648],[129,626],[130,602],[136,580]]}
   }
@@ -61,28 +66,36 @@ function regionShapes(side, row) {
 }
 
 export function strengthScores(entries, weight, exerciseKey) {
-  const best = new Map();
+  const records = new Map();
   for (const entry of entries) {
     const load = Number(entry.kg);
     const reps = Number(entry.r);
     if (!Number.isFinite(load) || load <= 0 || entry.t) continue;
-    if (!entry.rm && (!Number.isInteger(reps) || reps < 1 || reps > 10)) continue;
-    const max = entry.rm || reps === 1 ? load : load * (1 + reps / 30);
-    const name = exerciseKey(entry.x);
-    if (max > (best.get(name)?.max ?? 0)) best.set(name, {entry, max});
+    if (!entry.rm && (!Number.isInteger(reps) || reps < 1)) continue;
+    const measurement = entry.rm || reps === 1 ? "single" : reps <= 10 ? "estimate" : "minimum";
+    const max = measurement === "estimate" ? load * (1 + reps / 30) : load;
+    const name = exerciseName(exerciseKey(entry.x));
+    const record = records.get(name) ?? {};
+    if (load > (Number(record.heaviest?.kg) || 0)) record.heaviest = entry;
+    if (max > (record.best?.max ?? 0) ||
+        (max === record.best?.max && measurement === "single")) {
+      record.best = {entry,max,measurement};
+    }
+    records.set(name, record);
   }
 
   return muscles.map(muscle => {
     const candidates = muscle.exercises.flatMap(referenceExercise => {
-      const result = best.get(referenceExercise.exercise);
-      if (!result || !Number.isFinite(weight) || weight <= 0) return [];
-      const ratio = result.max / weight;
+      const record = records.get(exerciseName(referenceExercise.exercise));
+      if (!record || !Number.isFinite(weight) || weight <= 0) return [];
+      const ratio = record.best.max / weight;
+      const milestones = referenceExercise.equipment === "machine" ? machineMilestones : freeWeightMilestones;
       const thresholds = milestones.map(multiplier => Math.round(referenceExercise.bronze * multiplier * 1000) / 1000);
       const tier = thresholds.findLastIndex(target => ratio >= target);
-      return [{...referenceExercise, ...result, ratio, thresholds, tier}];
+      return [{...referenceExercise, ...record.best, heaviest:record.heaviest, ratio, thresholds, tier}];
     });
     // Compare exercises by their own milestones and keep the best result per area.
-    candidates.sort((a, b) => b.ratio / b.bronze - a.ratio / a.bronze);
+    candidates.sort((a, b) => b.tier - a.tier || b.ratio / b.bronze - a.ratio / a.bronze);
     return {...muscle, score:candidates[0]};
   });
 }
@@ -90,12 +103,13 @@ export function strengthScores(entries, weight, exerciseKey) {
 const equipmentText = {
   dumbbell:"Gewicht per dumbbell",
   barbell:"Totaalgewicht inclusief stang",
-  machine:"Vergelijk sets op hetzelfde apparaat",
+  machine:"Gelogde machinewaarde. Vergelijk sets op hetzelfde apparaat en met dezelfde instelling",
   extra:"Extra gewicht bovenop je lichaamsgewicht"
 };
 const format = (value, digits=1) => new Intl.NumberFormat("nl-NL",{maximumFractionDigits:digits}).format(value);
 const tone = score => ranks[score?.tier]?.color ?? (score?"#829aab":"#8e9a8c");
 const rankName = score => ranks[score?.tier]?.name ?? (score?"Onder Bronze":"Geen score");
+const setValue = entry => format(Number(entry.kg),3) + " kg " + (entry.rm ? "· 1RM" : "× " + format(Number(entry.r),0));
 const viewName = side => side==="front"?"Voorkant":"Achterkant";
 
 function bodyModel(side, rows, selected) {
@@ -112,15 +126,18 @@ function bodyModel(side, rows, selected) {
 function scoreDetail(row, weight) {
   const score = row.score;
   if (!score) {
-    const empty = weight > 0 ? "Log een gewogen set van 1–10 reps of een 1RM." : "Vul je lichaamsgewicht in om een rank te berekenen.";
+    const empty = weight > 0 ? "Log een gewogen set om een score te krijgen." : "Vul je lichaamsgewicht in om een rank te berekenen.";
     return `<div class="strength-empty"><strong>${empty}</strong><p>Meet met ${row.exercises.map(item=>item.exercise).join(" of ")}.</p></div>`;
   }
   const next = score.thresholds[score.tier + 1];
-  const achieved = score.entry.rm || Number(score.entry.r) === 1;
-  const setLabel = score.entry.rm ? "1RM" : "× " + format(Number(score.entry.r),0);
-  return `<div class="strength-value"><strong>${format(score.ratio,2)}<small>×</small></strong><span>je lichaamsgewicht</span></div>
-  <dl class="strength-facts"><div><dt>Gemeten met</dt><dd>${score.exercise}</dd></div><div><dt>Beste set voor deze score</dt><dd>${format(Number(score.entry.kg))} kg ${setLabel}</dd></div><div><dt>${achieved?"Gelogde 1 rep":"Geschatte 1RM"}</dt><dd>${format(score.max)} kg</dd></div></dl>
+  const measurementLabel = {single:"Gelogde 1 rep",estimate:"Geschatte 1RM",minimum:"Ondergrens voor 1RM"};
+  return `<div class="strength-value"><strong>${score.measurement==="minimum"?"≥ ":""}${format(score.ratio,2)}<small>×</small></strong><span>je lichaamsgewicht</span></div>
+  <dl class="strength-facts"><div><dt>Gemeten met</dt><dd>${score.exercise}</dd></div><div><dt>Zwaarste gelogde set</dt><dd>${setValue(score.heaviest)}</dd></div>
+  ${score.heaviest!==score.entry?`<div><dt>Gebruikte set voor je score</dt><dd>${setValue(score.entry)}</dd></div>`:""}
+  <div><dt>${measurementLabel[score.measurement]}</dt><dd>${format(score.max,3)} kg</dd></div></dl>
+  ${score.measurement==="minimum"?`<p class="last">Meer dan 10 reps. Het gelogde gewicht telt als ondergrens, zonder 1RM-schatting.</p>`:""}
   <p class="last">${equipmentText[score.equipment]}.</p>
+  ${row.note?`<p class="last">${row.note}</p>`:""}
   ${next ? `<div class="strength-target"><strong>Volgende rank · ${ranks[score.tier+1].name}</strong><span>Vanaf ${format(next,3)}× lichaamsgewicht · ${format(next*weight)} kg 1RM</span></div>` : `<div class="strength-target"><strong>Legend bereikt</strong></div>`}`;
 }
 
@@ -130,7 +147,7 @@ export function strengthView(entries, weight, exerciseKey, selection, side) {
   return `<section class="strength-layout ${weight>0?"":"strength-needs-weight"}" aria-label="Kracht per spiergroep">
   <div class="card strength-stage" data-body-side="${side}">
     <div class="strength-toolbar"><h2>Spierkaart</h2><div class="row strength-switch" aria-label="Aanzicht">${["front","back"].map(view=>`<button type="button" class="${view===side?"p":""}" data-body-view="${view}" aria-pressed="${view===side}">${viewName(view)}</button>`).join("")}</div></div>
-    <div class="body-selection" style="--rank-color:${tone(row.score)}" aria-live="polite"><strong>${row.name}</strong><span class="rank-pill">${rankName(row.score)}</span>${row.score?`<span>${format(row.score.ratio,2)}× lichaamsgewicht</span>`:""}</div>
+    <div class="body-selection" style="--rank-color:${tone(row.score)}" aria-live="polite"><strong>${row.name}</strong><span class="rank-pill">${rankName(row.score)}</span>${row.score?`<span>${row.score.measurement==="minimum"?"≥ ":""}${format(row.score.ratio,2)}× lichaamsgewicht</span>`:""}</div>
     <div class="strength-bodies">${["front","back"].map(view=>bodyModel(view,rows,row.id)).join("")}</div>
     <div class="strength-rank-key" aria-label="Kleuren per rank">
       ${[ {name:"Geen score",color:tone()}, {name:"Onder Bronze",color:tone({})}, ...ranks ].map(rank=>`<span style="--rank-color:${rank.color}">${rank.name}</span>`).join("")}
@@ -145,8 +162,9 @@ export function strengthView(entries, weight, exerciseKey, selection, side) {
     <section class="card strength-list"><h2>Alle spiergroepen</h2><div class="muscle-list">${rows.map(item=>`<button type="button" data-muscle="${item.id}" aria-pressed="${item.id===row.id}" style="--rank-color:${tone(item.score)}"><span>${item.name}</span><span class="rank-pill">${rankName(item.score)}</span></button>`).join("")}</div></section>
   </div>
   <details class="card strength-method"><summary>Hoe worden de ranks berekend?</summary>
-    <p>De score is je beste gelogde of geschatte 1RM gedeeld door je huidige lichaamsgewicht. Voor 2–10 reps gebruiken we de Epley-formule (gewicht × (1 + herhalingen / 30)). Tijdssets en sets zonder extra gewicht tellen niet mee. De hoogste relatieve mijlpaal per spiergroep bepaalt welke oefening je ziet.</p>
-    <p>De drempels verschillen per oefening. Dit zijn app-mijlpalen op basis van oefeningen, geen geïsoleerde meting van een spier of officiële krachtstandaard. Vergelijk machine- en kabelsets op hetzelfde apparaat.</p>
+    <p>De score is je beste gelogde 1RM, geschatte 1RM of ondergrens gedeeld door je huidige lichaamsgewicht. Voor 2–10 reps gebruiken we de Epley-formule (gewicht × (1 + herhalingen / 30)). Bij meer dan 10 reps telt het gelogde gewicht als ondergrens. Tijdssets en sets zonder extra gewicht tellen niet mee. De hoogste relatieve mijlpaal per spiergroep bepaalt welke oefening je ziet.</p>
+    <p>De drempels verschillen per oefening. Dit zijn app-mijlpalen op basis van oefeningen, geen geïsoleerde meting van een spier of officiële krachtstandaard. Bench Press telt bijvoorbeeld voor borst, terwijl triceps en schouders meehelpen. Plank en Captains Chair blijven in je trainingslog en hebben hier geen eigen krachtrank. Machine- en kabeldrempels lopen sneller op. Vergelijk die sets op hetzelfde apparaat met dezelfde instelling.</p>
+    <ul class="strength-exercise-guide">${muscles.map(muscle=>`<li><strong>${muscle.name}</strong> · ${muscle.exercises.map(item=>item.exercise).join(", ")}</li>`).join("")}</ul>
   </details>
   </section>`;
 }
