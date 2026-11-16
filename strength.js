@@ -59,10 +59,44 @@ const bodyRegions = {
   }
 };
 
-function regionShapes(side, row) {
-  const {outline, pair} = bodyRegions[side][row.id];
-  const shapes = pair ? [outline, outline.map(([x,y])=>[440-x,y])] : [outline];
-  return shapes.map(shape=>shape.map(([x,y])=>`${(x/4.4).toFixed(2)}% ${(y/8.22).toFixed(2)}%`).join(","));
+function regionCoordinates(side, id) {
+  const {outline, pair} = bodyRegions[side][id];
+  return pair ? [outline, outline.map(([x,y])=>[440-x,y])] : [outline];
+}
+
+export function exerciseMuscles(name) {
+  const key = exerciseName(name);
+  return muscles.filter(muscle=>muscle.exercises.some(item=>exerciseName(item.exercise)===key));
+}
+
+export function paintWorkoutRegions(context, side, ids, x, y, width, height) {
+  context.save();
+  context.translate(x,y);
+  context.scale(width/440,height/822);
+  context.globalCompositeOperation = "color";
+  context.fillStyle = "#d5fa64";
+  for (const id of ids) {
+    if (!bodyRegions[side][id]) continue;
+    for (const outline of regionCoordinates(side,id)) {
+      context.beginPath();
+      outline.forEach(([px,py], index)=>index ? context.lineTo(px,py) : context.moveTo(px,py));
+      context.closePath();
+      context.fill();
+    }
+  }
+  context.restore();
+}
+
+export const dateStep = date => Math.round(Date.parse(date+"T00:00:00Z")/86400000);
+export const stepDate = step => new Date(Number(step)*86400000).toISOString().slice(0,10);
+const dateLabel = date => new Intl.DateTimeFormat("nl-NL",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(date+"T00:00:00Z"));
+const isDate = value => typeof value==="string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(dateStep(value));
+
+export function strengthSnapshot(entries, weights, currentWeight, currentDate, date) {
+  if (date===currentDate) return {entries,weight:currentWeight};
+  const weight = weights.filter(item=>isDate(item.d)&&item.d<=date&&Number(item.kg)>0)
+    .reduce((latest,item)=>!latest||item.d>=latest.d?item:latest,null);
+  return {entries:entries.filter(entry=>isDate(entry.d)&&entry.d<=date), weight:Number(weight?.kg)||0};
 }
 
 export function strengthScores(entries, weight, exerciseKey) {
@@ -116,23 +150,24 @@ function bodyModel(side, rows, selected) {
   return `<figure class="body-model" data-side="${side}">
     <figcaption>${viewName(side)}</figcaption>
     <div class="body-image"><img src="body-${side}.jpg" alt="3D-anatomiemodel, ${viewName(side).toLowerCase()}" width="440" height="822">
-    ${rows.filter(row=>row.points[side]).flatMap(row=>regionShapes(side,row).map(path=>`<div class="muscle-region" data-muscle="${row.id}" data-scored="${Boolean(row.score)}" data-selected="${row.id===selected}" style="--rank-color:${tone(row.score)};--region:polygon(${path})" aria-hidden="true"></div>`)).join("")}
+    ${rows.filter(row=>row.points[side]).flatMap(row=>regionCoordinates(side,row.id).map(shape=>shape.map(([x,y])=>`${x/4.4}% ${y/8.22}%`).join(",")).map(path=>`<div class="muscle-region" data-muscle="${row.id}" data-scored="${Boolean(row.score)}" data-selected="${row.id===selected}" style="--rank-color:${tone(row.score)};--region:polygon(${path})" aria-hidden="true"></div>`)).join("")}
     ${rows.filter(row=>row.points[side]).map(row=>{
       const [x,y]=row.points[side];
       return `<button class="muscle-point" type="button" data-muscle="${row.id}" style="--x:${x}%;--y:${y}%;--rank-color:${tone(row.score)}" aria-label="${row.name}: ${rankName(row.score)}" aria-pressed="${row.id===selected}" title="${row.name}"><span></span></button>`;
     }).join("")}</div></figure>`;
 }
 
-function scoreDetail(row, weight) {
+function scoreDetail(row, weight, historical) {
   const score = row.score;
   if (!score) {
-    const empty = weight > 0 ? "Log een gewogen set om een score te krijgen." : "Vul je lichaamsgewicht in om een rank te berekenen.";
+    const empty = weight > 0 ? "Log een gewogen set om een score te krijgen." : historical?"Geen lichaamsgewicht gelogd op of vóór deze datum.":"Vul je lichaamsgewicht in om een rank te berekenen.";
     return `<div class="strength-empty"><strong>${empty}</strong><p>Meet met ${row.exercises.map(item=>item.exercise).join(" of ")}.</p></div>`;
   }
   const next = score.thresholds[score.tier + 1];
   const measurementLabel = {single:"Gelogde 1 rep",estimate:"Geschatte 1RM",minimum:"Ondergrens voor 1RM"};
   return `<div class="strength-value"><strong>${score.measurement==="minimum"?"≥ ":""}${format(score.ratio,2)}<small>×</small></strong><span>je lichaamsgewicht</span></div>
   <dl class="strength-facts"><div><dt>Gemeten met</dt><dd>${score.exercise}</dd></div><div><dt>Zwaarste gelogde set</dt><dd>${setValue(score.heaviest)}</dd></div>
+  ${isDate(score.entry.d)?`<div><dt>Datum van je scoreset</dt><dd>${dateLabel(score.entry.d)}</dd></div>`:""}
   ${score.heaviest!==score.entry?`<div><dt>Gebruikte set voor je score</dt><dd>${setValue(score.entry)}</dd></div>`:""}
   <div><dt>${measurementLabel[score.measurement]}</dt><dd>${format(score.max,3)} kg</dd></div></dl>
   ${score.measurement==="minimum"?`<p class="last">Meer dan 10 reps. Het gelogde gewicht telt als ondergrens, zonder 1RM-schatting.</p>`:""}
@@ -141,11 +176,27 @@ function scoreDetail(row, weight) {
   ${next ? `<div class="strength-target"><strong>Volgende rank · ${ranks[score.tier+1].name}</strong><span>Vanaf ${format(next,3)}× lichaamsgewicht · ${format(next*weight)} kg 1RM</span></div>` : `<div class="strength-target"><strong>Legend bereikt</strong></div>`}`;
 }
 
-export function strengthView(entries, weight, exerciseKey, selection, side) {
-  const rows = strengthScores(entries, weight, exerciseKey);
+export function strengthView(entries, weight, exerciseKey, selection, side, history, moment) {
+  const {today, date, weights} = history;
+  const historical = date!==today;
+  const snapshot = strengthSnapshot(entries,weights,weight,today,date);
+  const rows = strengthScores(snapshot.entries,snapshot.weight,exerciseKey);
+  const earliest = [today,...entries.map(entry=>entry.d),...weights.map(entry=>entry.d)].filter(isDate).sort()[0];
+  const daysBack = Math.min(30,dateStep(today)-dateStep(earliest));
+  const compare = historical ? strengthScores(entries,weight,exerciseKey) : [];
+  const changes = row => {
+    const current = compare.find(item=>item.id===row.id)?.score;
+    if (!historical || rankName(current)===rankName(row.score)) return "";
+    return `<span class="last">Vandaag · ${rankName(current)}</span>`;
+  };
   const row = rows.find(item=>item.id===selection) ?? rows[0];
   return `<section class="strength-layout ${weight>0?"":"strength-needs-weight"}" aria-label="Kracht per spiergroep">
-  <div class="card strength-stage" data-body-side="${side}">
+  <section class="card strength-timeline" aria-label="Tijdlijn spierkaart">
+    <div><h2>Tijdlijn</h2><output for="strength-timeline">${date===today?"Vandaag · ":""}${dateLabel(date)}</output></div>
+    <label class="timeline-range">Datum op spierkaart <input id="strength-timeline" type="range" min="${dateStep(earliest)}" max="${dateStep(today)}" value="${dateStep(date)}" aria-valuetext="${dateLabel(date)}" ${earliest===today?"disabled":""}></label>
+    <div class="row"><button data-strength-date="${stepDate(dateStep(today)-daysBack)}" ${earliest===today?"disabled":""}>${daysBack===30?"30 dagen terug":"Oudste datum"}</button><button class="p" data-strength-date="${today}">Vandaag</button></div>
+  </section>
+  <div class="card strength-stage${moment===row.id?" pr-pulse":""}" data-body-side="${side}">
     <div class="strength-toolbar"><h2>Spierkaart</h2><div class="row strength-switch" aria-label="Aanzicht">${["front","back"].map(view=>`<button type="button" class="${view===side?"p":""}" data-body-view="${view}" aria-pressed="${view===side}">${viewName(view)}</button>`).join("")}</div></div>
     <div class="body-selection" style="--rank-color:${tone(row.score)}" aria-live="polite"><strong>${row.name}</strong><span class="rank-pill">${rankName(row.score)}</span>${row.score?`<span>${row.score.measurement==="minimum"?"≥ ":""}${format(row.score.ratio,2)}× lichaamsgewicht</span>`:""}</div>
     <div class="strength-bodies">${["front","back"].map(view=>bodyModel(view,rows,row.id)).join("")}</div>
@@ -155,11 +206,11 @@ export function strengthView(entries, weight, exerciseKey, selection, side) {
   </div>
   <div class="strength-info">
     <section class="card strength-detail" style="--rank-color:${tone(row.score)}" aria-labelledby="muscle-title">
-      <form class="strength-weight" id="strength-weight"><label for="bw">Lichaamsgewicht <span><input id="bw" name="weight" type="number" step="any" min="1" inputmode="decimal" value="${weight>0?weight:""}" required> kg</span></label><button type="submit">Opslaan</button></form>
+      ${historical?`<p class="historical-weight">Lichaamsgewicht op ${dateLabel(date)} · ${snapshot.weight>0?format(snapshot.weight)+" kg":"Geen meting"}</p>`:`<form class="strength-weight" id="strength-weight"><label for="bw">Lichaamsgewicht <span><input id="bw" name="weight" type="number" step="any" min="1" inputmode="decimal" value="${weight>0?weight:""}" required> kg</span></label><button type="submit">Opslaan</button></form>`}
       <div class="strength-heading"><h2 id="muscle-title">${row.name}</h2><span class="rank-pill">${rankName(row.score)}</span></div>
-      ${scoreDetail(row, weight)}
+      ${changes(row)}${scoreDetail(row, snapshot.weight, historical)}
     </section>
-    <section class="card strength-list"><h2>Alle spiergroepen</h2><div class="muscle-list">${rows.map(item=>`<button type="button" data-muscle="${item.id}" aria-pressed="${item.id===row.id}" style="--rank-color:${tone(item.score)}"><span>${item.name}</span><span class="rank-pill">${rankName(item.score)}</span></button>`).join("")}</div></section>
+    <section class="card strength-list"><h2>Alle spiergroepen</h2><div class="muscle-list">${rows.map(item=>`<button type="button" data-muscle="${item.id}" aria-pressed="${item.id===row.id}" style="--rank-color:${tone(item.score)}"><span>${item.name}</span><span class="rank-pill">${rankName(item.score)}</span>${changes(item)}</button>`).join("")}</div></section>
   </div>
   <details class="card strength-method"><summary>Hoe worden de ranks berekend?</summary>
     <p>De score is je beste gelogde 1RM, geschatte 1RM of ondergrens gedeeld door je huidige lichaamsgewicht. Voor 2–10 reps gebruiken we de Epley-formule (gewicht × (1 + herhalingen / 30)). Bij meer dan 10 reps telt het gelogde gewicht als ondergrens. Tijdssets en sets zonder extra gewicht tellen niet mee. De hoogste relatieve mijlpaal per spiergroep bepaalt welke oefening je ziet.</p>

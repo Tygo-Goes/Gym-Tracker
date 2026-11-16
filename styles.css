@@ -622,3 +622,119 @@ form input, form select, .bw input { box-shadow: inset 0 2px 5px #0005; }
   content: ""; width: 8px; height: 8px; border-radius: 50%;
   background: var(--rank-color);
 }
+
+.strength-timeline {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 20px;
+}
+.strength-timeline output, .timeline-range, .historical-weight { color: var(--mu); font-size: .82rem; }
+.strength-timeline output { display: block; margin-top: 4px; }
+.timeline-range {
+  flex: 1 1 170px;
+  display: grid;
+  gap: 4px;
+}
+.timeline-range input { width: 100%; min-height: 28px; accent-color: var(--ac); }
+.strength-timeline .row { margin: 0; flex: 0 1 auto; }
+.historical-weight { margin: 0 0 16px; }
+.muscle-list button .last { width: 100%; margin: 0; }
+#pr-moment {
+  position: fixed;
+  right: 22px;
+  bottom: 24px;
+  z-index: 25;
+  width: min(360px, calc(100vw - 36px));
+  padding: 15px;
+  border: 1px solid #92af57;
+  border-radius: 15px;
+  background: linear-gradient(150deg,#273522,#131b12);
+  box-shadow: 0 12px 36px #000a;
+}
+.pr-moment-label { color: var(--ac); font-weight: 800; font-size: .82rem; }
+#pr-moment strong { overflow-wrap: anywhere; }
+.pr-close {
+  width: 44px;
+  height: 44px;
+  color: var(--mu);
+  background: transparent;
+  border: 1px solid var(--ln);
+  border-radius: 9px;
+  font-size: 20px;
+}
+.pr-close:hover { color: var(--tx); border-color: var(--ac); }
+.pr-pulse .muscle-region[data-selected="true"] { animation: pr-highlight 1.15s ease-out 2; }
+.pr-pulse .muscle-point[aria-pressed="true"] span { animation: pr-dot 1.15s ease-out 2; }
+@keyframes pr-highlight {
+  40% { background: #e8ff92; opacity: 1; filter: brightness(1.3); }
+}
+@keyframes pr-dot {
+  40% { box-shadow: 0 0 0 4px #f1ffbf, 0 0 24px 13px #d5fa64; }
+}
+#workout-summary {
+  width: min(440px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  color: var(--tx);
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  padding: 0;
+}
+#workout-summary::backdrop { background: #050805cf; }
+.workout-summary { margin: 0; }
+.workout-summary h2 { margin: 0; font: 700 32px/1 var(--display); }
+.workout-preview {
+  display: grid;
+  place-items: center;
+  min-height: 80px;
+  margin-top: 12px;
+  border-radius: 10px;
+  background: #101610;
+  color: var(--mu);
+}
+.workout-preview img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 53dvh;
+  border-radius: 10px;
+}
+.hist .session-share { width: auto; padding-inline: 10px; }
+@media (max-width: 760px) {
+  .strength-timeline { grid-row: 1; gap: 8px 12px; }
+  .strength-timeline .row { width: 100%; }
+  .strength-stage, .strength-needs-weight .strength-detail { grid-row: 2; }
+  .strength-detail, .strength-needs-weight .strength-stage { grid-row: 3; }
+  .strength-list { grid-row: 4; }
+  #pr-moment { bottom: calc(72px + env(safe-area-inset-bottom)); right: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pr-pulse .muscle-point[aria-pressed="true"] span { box-shadow: 0 0 0 4px #d5fa64; animation: none; }
+  .pr-pulse .muscle-region[data-selected="true"] { animation: none; }
+}
+
+.workout-model {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px;
+  border: 1px solid #3b4d34;
+  border-radius: 12px;
+  background: #0e140e;
+}
+.workout-model canvas {
+  display: block;
+  width: auto;
+  height: clamp(195px,41dvh,370px);
+  max-width: 100%;
+  object-fit: contain;
+}
+.workout-views {
+  width: 100%;
+  margin: 0;
+}
+.workout-export { margin-top: 10px; font-size: .84rem; color: var(--mu); }
+.workout-export summary { padding-block: 7px; }
