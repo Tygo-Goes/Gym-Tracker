@@ -25,6 +25,7 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {getFirestore,doc,getDoc,setDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {firebaseConfig} from "./firebase-config.js";
+import {strengthView, muscles} from "./strength.js";
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 const DAYS=[
@@ -36,6 +37,7 @@ const AL={'Ab Crunch':'Crunches','Ab Rotary Machine':'Rotary Torso'},K=x=>AL[x]|
 const $=s=>document.querySelector(s);
 const ICONS={
  train:'<path d="m6 18 12-12M4 13l7 7M13 4l7 7M2 16l6 6M16 2l6 6"/>',
+ strength:'<circle cx="12" cy="4" r="2"/><path d="m5 10 4-2h6l4 2m-7-2v6m-3 7 3-7 3 7"/>',
  stats:'<path d="M4 4v16h16M9 15v-3m5 3V8m5 7V5"/>',
  wrapped:'<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M3 7h18v4H3zM12 7v14m0-14C6 8 6 2 9 3c2 0 3 4 3 4Zm0 0c6 1 6-5 3-4-2 0-3 4-3 4Z"/>',
  trophy:'<path d="M8 4h8v5a4 4 0 0 1-8 0V4Zm0 2H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v5m-4 2h8"/>',
@@ -47,7 +49,7 @@ const ICONS={
 };
 const icon=n=>`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
 const active=(value)=>`class="${value?"on":""}" aria-pressed="${Boolean(value)}"`;
-let lastDay=0;
+let lastDay=0,strengthMuscle="chest",bodySide="front";
 
 let S={e:[]},pick=0,tab=0,open={},ref=null;
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
@@ -73,7 +75,7 @@ async function save(checkLeaderboard=false){
 }
 onAuthStateChanged(auth,async u=>{
  user=u;ref=null;S={e:[],c:[],o:{},h:[],bw:0,ss:[],pn:{}};
- pick=0;tab=0;lastDay=0;open={};ordering=false;lbD=[];authErr="";$("#toast").className="";
+ pick=0;tab=0;lastDay=0;strengthMuscle="chest";bodySide="front";open={};ordering=false;lbD=[];authErr="";$("#toast").className="";
  if(u){
   pick="loading";render();
   const r=doc(db,"users",u.uid);
@@ -119,7 +121,7 @@ function card(nm){const x=K(nm),h=sets(x),rm=S.e.filter(e=>e.x==x&&e.rm).sort((a
   `<label class="w">Datum<input name="d" type="date" value="${today()}"></label><label class="w">Notitie (optioneel)<input name="nt" maxlength="80" placeholder="bijv. betere form"></label>`+(plank?"":`<label class="chk w"><input name="rm" type="checkbox"> Dit is een 1 rep max</label>`)+`<button>Opslaan</button></form>`:"";
  const wu=o=="w"&&l&&l.kg>0&&!plank?warm(nm,l.kg):"",cs=o=="c"?chart(x):"",hs=o=="h"?`<div class="hist">`+(S.e.some(e=>e.x==x)?S.e.filter(e=>e.x==x).sort((a,b)=>(b.d||"").localeCompare(a.d||"")).map(e=>`<div><span>${fmt(e.d)}</span><span>${e.t?esc(e.t):e.kg+" kg × "+e.r}${e.rm?" <b>1RM</b>":""}${e.nt?`<br><i>${esc(e.nt)}</i>`:""}</span><button data-del="${esc(e.id)}" aria-label="Verwijder set">✕</button></div>`).join(""):`<p class="last">Nog geen sets in de historie.</p>`)+`</div>`:"";
  return `<article class="card exercise"><div class="top"><div class="exercise-title"><span class="exercise-icon">${icon(plank?"clock":"train")}</span><div><div class="nm">${esc(nm)}</div><small>${grp(x)}</small></div></div>${pr?`<div class="pr">${pr}</div>`:""}${ordering?`<span class="mv"><button aria-label="Omhoog verplaatsen" data-mv="${esc(nm)}|-1">▲</button><button aria-label="Omlaag verplaatsen" data-mv="${esc(nm)}|1">▼</button>${(S.c||[]).some(c=>c.n==nm)?`<button data-ty="${esc(nm)}" aria-label="Wissel tussen gewicht en tijd">⏱</button>`:""}<button data-xd="${esc(nm)}" aria-label="Verwijder oefening">✕</button></span>`:""}</div><div class="exercise-meta">${last}${est?`<div class="last">${est}</div>`:""}${sug?`<div class="last">Volgende keer · ${sug}</div>`:""}${!plank&&stag(x)?`<div class="last">3 trainingen hetzelfde. Probeer iets zwaarder of 1 rep extra.</div>`:""}</div>
- <div class="row"><button class="p" aria-expanded="${o=="f"}" data-f="${esc(nm)}">+ Set loggen</button>${l?`<button data-same="${esc(nm)}">Herhaal set</button>`:""}<button class="${o=="h"?"selected":""}" aria-expanded="${o=="h"}" data-h="${esc(nm)}">Historie</button>${plank?"":`<button class="icon-only ${o=="c"?"selected":""}" aria-expanded="${o=="c"}" aria-label="Grafiek" title="Grafiek" data-c="${esc(nm)}">${icon("stats")}</button>`}${!plank&&l&&l.kg>0?`<button class="icon-only ${o=="w"?"selected":""}" aria-expanded="${o=="w"}" aria-label="Warming-up" title="Warming-up" data-w="${esc(nm)}">${icon("flame")}</button>`:""}</div>${pn||ordering?`<button class="note" data-pn="${esc(nm)}">${pn?"📌 "+esc(pn):"+ Vaste notitie"}</button>`:""}${f}${cs}${wu}${hs}</article>`}
+ <div class="row"><button class="p" aria-expanded="${o=="f"}" data-f="${esc(nm)}">+ Set<span class="wide-action-label"> loggen</span></button>${l?`<button data-same="${esc(nm)}">Herhaal<span class="wide-action-label"> set</span></button>`:""}<button class="${o=="h"?"selected":""}" aria-expanded="${o=="h"}" data-h="${esc(nm)}">Historie</button>${plank?"":`<button class="icon-only ${o=="c"?"selected":""}" aria-expanded="${o=="c"}" aria-label="Grafiek" title="Grafiek" data-c="${esc(nm)}">${icon("stats")}</button>`}${!plank&&l&&l.kg>0?`<button class="icon-only ${o=="w"?"selected":""}" aria-expanded="${o=="w"}" aria-label="Warming-up" title="Warming-up" data-w="${esc(nm)}">${icon("flame")}</button>`:""}</div>${pn||ordering?`<button class="note" data-pn="${esc(nm)}">${pn?"📌 "+esc(pn):"+ Vaste notitie"}</button>`:""}${f}${cs}${wu}${hs}</article>`}
 let wy=new Date().getFullYear();
 const WL=["Jan – apr","Mei – aug","Sep – dec","Heel jaar"],nf=n=>Math.round(n).toLocaleString("nl-NL");
 const rng=(y,p)=>{const a=p==3?1:p*4+1,b=p==3?12:p*4+4,z=n=>String(n).padStart(2,"0");return[y+"-"+z(a)+"-00",y+"-"+z(b)+"-32"]};
@@ -234,6 +236,7 @@ function statsView(){const z=n=>String(n).padStart(2,"0"),bh=(S.bwh||[]).slice()
  (rows.length?rows.map(g=>`<div class="last" style="display:flex;justify-content:space-between;margin-top:10px"><span>${g}</span><span>${cnt[g]}</span></div><div class="bar"><i style="width:${Math.round(cnt[g]/mx*100)}%"></i></div>`).join(""):`<div class="last" style="margin-top:10px">Nog geen sets in deze periode.</div>`)+`</div>`+rackCard()+"</div>"}
 function start(n){S.n=n;S.e=[];pick=0;save();render()}
 const pageInfo={
+ k:["strength","Kracht","Je kracht per spiergroep, in verhouding tot je lichaamsgewicht."],
  s:["stats","Statistieken","Je lichaamsgewicht en sets per spiergroep."],
  w:["wrapped","Wrapped","Je trainingsmomenten, records en mijlpalen op een rij."],
  l:["trophy","Leaderboard","Bekijk de ranglijst en vergelijk je voortgang."]
@@ -280,7 +283,7 @@ function render(){
  <div class="hero-progress"><div class="level-ring" style="--progress:${pct}%" role="progressbar" aria-label="Voortgang naar level ${level+1}" aria-valuemin="0" aria-valuemax="${next-base}" aria-valuenow="${progress}"><div><strong>${level}</strong><span>Level</span></div></div><div class="level-summary"><strong>${nf(x)} XP</strong><small>Nog ${nf(next-x)} XP</small></div></div>`;
 
  if(tab==="l")lbView();
- else $("#list").innerHTML=tab==="w"?wview():tab==="s"?statsView():dayTools();
+ else $("#list").innerHTML=tab==="w"?wview():tab==="s"?statsView():tab==="k"?strengthView(S.e,Number(S.bw),K,strengthMuscle,bodySide):dayTools();
  const updatedPicker=$("#list .day-picker");
  if(updatedPicker){
   updatedPicker.scrollLeft=dayScroll;
@@ -293,9 +296,23 @@ function render(){
   current?.focus({preventScroll:true});
  }
 }
-document.addEventListener("click",ev=>{const t=ev.target.closest("button,a,[data-wp],[data-wy]");if(!t||t.closest("#wr,#sc"))return;const wp=t.closest("[data-wp]");if(wp){story(+wp.dataset.wp);return}const wb=t.closest("[data-wy]");if(wb){wy=+wb.dataset.wy;render();return}
+document.addEventListener("click",ev=>{const t=ev.target.closest("button,a,[data-wp],[data-wy],.muscle-region");if(!t||t.closest("#wr,#sc"))return;const wp=t.closest("[data-wp]");if(wp){story(+wp.dataset.wp);return}const wb=t.closest("[data-wy]");if(wb){wy=+wb.dataset.wy;render();return}
  if(t.id=="lo"||t.dataset.exit){ev.preventDefault();signOut(auth).catch(()=>toast("Uitloggen mislukt"))}
  else if(t.dataset.retry){location.reload()}
+ else if(t.dataset.muscle){
+  strengthMuscle=t.dataset.muscle;
+  const selected=muscles.find(muscle=>muscle.id===strengthMuscle);
+  if(!selected.points[bodySide])bodySide=selected.points.front?"front":"back";
+  const model=t.closest(".body-model");
+  if(model)bodySide=model.dataset.side;
+  render();
+  const target=model?`.body-model[data-side="${bodySide}"] .muscle-point`:".muscle-list button";
+  $(`${target}[data-muscle="${strengthMuscle}"]`)?.focus({preventScroll:true});
+ }
+ else if(t.dataset.bodyView){
+  bodySide=t.dataset.bodyView;render();
+  $(`[data-body-view="${bodySide}"]`)?.focus({preventScroll:true});
+ }
  else if(t.dataset.ord){ordering=!ordering;render()}
  else if(t.dataset.mv){const value=t.dataset.mv,n=value.slice(0,value.lastIndexOf("|")),d=value.slice(value.lastIndexOf("|")+1),l=D()[tab].ex,i=l.indexOf(n),j=i+ +d;if(j>=0&&j<l.length){[l[i],l[j]]=[l[j],l[i]];save();render()}}
  else if(t.dataset.ty){const c=S.c.find(c=>c.n==t.dataset.ty);if(c){c.t=c.t=="t"?"kg":"t";save();render();toast(c.t=="t"?"Nu op tijd":"Nu op gewicht × reps")}}
@@ -333,6 +350,7 @@ document.addEventListener("submit",async ev=>{ev.preventDefault();const f=ev.tar
    $('#auth [name="m"]').value=v.m;
   }finally{for(const button of actions)button.disabled=false}
   return}
+ if(f.id=="strength-weight"){saveWeight(f.elements.weight.value);return}
  if(f.id=="nm"){const n=f.elements.n.value.replace(/["<>&\\]/g,"").trim();if(n)start(n);return}
  if(f.id=="addx"){const n=f.elements.n.value.replace(/["<>&\\]/g,"").trim();const all=D().flatMap(d=>d.ex);
   if(!n)return;if(all.some(a=>a.toLowerCase()==n.toLowerCase())){toast("Die oefening bestaat al");return}
@@ -343,5 +361,15 @@ document.addEventListener("submit",async ev=>{ev.preventDefault();const f=ev.tar
   if(n.rm)msg="Nieuwe 1RM opgeslagen 🏆";else{const b=best(x);if(b&&better(n,b))msg="Nieuw PR! 🔥"}}
 const ns=Math.max(1,Math.min(10,parseInt(v.ns)||1)),xb=snap();S.e.push(n);if(!n.rm)for(let k=1;k<ns;k++)S.e.push({...n,id:uid()});
  open[nm]=0;save();render();const tp=n.rm?[]:tips(x,n);lvu(xb,tp);toast([msg+(ns>1&&!n.rm?" ("+ns+" sets)":""),...tp].join("\n"),tp.length?6000:2200)});
-document.addEventListener("change",ev=>{if(ev.target.id=="bw"){S.bw=parseFloat(String(ev.target.value).replace(",","."))||0;if(S.bw>0){S.bwh=(S.bwh||[]).filter(e=>e.d!=today());S.bwh.push({d:today(),kg:S.bw})}save();render();toast("Lichaamsgewicht opgeslagen ✓")}});
+function saveWeight(value) {
+ S.bw=parseFloat(String(value).replace(",","."))||0;
+ if(S.bw>0){
+  S.bwh=(S.bwh||[]).filter(e=>e.d!=today());
+  S.bwh.push({d:today(),kg:S.bw});
+ }
+ save();render();toast("Lichaamsgewicht opgeslagen ✓");
+}
+document.addEventListener("change",ev=>{
+ if(ev.target.id==="bw"&&!ev.target.closest("#strength-weight"))saveWeight(ev.target.value);
+});
 </script></body></html>
