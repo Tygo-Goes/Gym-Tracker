@@ -239,7 +239,7 @@ function publishedSets(entries){
    list.sort((a,b)=>b.d.localeCompare(a.d)||b.i-a.i);
    const best=list.reduce((a,b)=>better(b,a)?b:a);
    const clean=({kg,r,d})=>({kg,r,d});
-   return {x,best:clean(best),latest:list.slice(0,5).map(clean)};
+   return {x,group:grp(x),best:clean(best),latest:list.slice(0,5).map(clean)};
  });
 }
 function leaderboardData(){const x=xpOf();return S.lb===false?{on:false}:{on:true,n:S.n||"Anoniem",xp:x,l:lvOf(x),pr:prAll().length,sets:S.e.filter(e=>!e.rm).length,days:new Set(S.e.filter(e=>e.d).map(e=>e.d)).size,ws:wkStreak(),t:Date.now(),...(S.shareSets?{sharedSets:publishedSets(S.e)}:{})}}
@@ -280,7 +280,8 @@ function sharedSection(rows){
        const perPerson=rankings.get(exercise.x);
        if(better(exercise.best,perPerson.get(person.id)))perPerson.set(person.id,describe(exercise.best));
      }
-     if(usable(exercise.best)&&better(exercise.best,heaviest))heaviest=describe(exercise.best);
+     const muscle=GM[exercise.x]||exercise.group;
+     if(GR.includes(muscle)&&muscle!=="Benen"&&usable(exercise.best)&&better(exercise.best,heaviest))heaviest=describe(exercise.best);
      for(const set of Array.isArray(exercise.latest)?exercise.latest:[]){
        if(usable(set))recent.push(describe(set));
      }
@@ -289,7 +290,7 @@ function sharedSection(rows){
  }
  best.sort((a,b)=>b.kg-a.kg||b.r-a.r);
  let place=0;
- const overall=best.length?'<section class="card"><h3 class="nm">Zwaarste sets · alle oefeningen</h3><ol class="rank-list">'+best.map((s,i)=>{
+ const overall=best.length?'<section class="card"><h3 class="nm">Zwaarste sets · zonder benen</h3><ol class="rank-list">'+best.map((s,i)=>{
    if(!i||s.kg!==best[i-1].kg||s.r!==best[i-1].r)place=i+1;
    return '<li class="rank"><span class="rank-number">'+place+'</span><div><strong>'+esc(String(s.n))+'</strong><div class="last">'+esc(s.x)+' · '+s.d.split("-").reverse().join("-")+'</div></div><b>'+s.kg.toLocaleString("nl-NL")+' kg × '+s.r+'</b></li>';
  }).join("")+'</ol></section>':'';
