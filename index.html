@@ -24,7 +24,7 @@
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,writeBatch,doc,getDoc,setDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getFirestore,writeBatch,onSnapshot,query,where,doc,getDoc,setDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {firebaseConfig} from "./firebase-config.js";
 import {strengthView, muscles, exerciseMuscles, stepDate} from "./strength.js";
 import {showWorkoutSummary} from "./workout.js";
@@ -245,13 +245,71 @@ function publishedSets(entries){
 function leaderboardData(){const x=xpOf();return S.lb===false?{on:false}:{on:true,n:S.n||"Anoniem",xp:x,l:lvOf(x),pr:prAll().length,sets:S.e.filter(e=>!e.rm).length,days:new Set(S.e.filter(e=>e.d).map(e=>e.d)).size,ws:wkStreak(),t:Date.now(),...(S.shareSets?{sharedSets:publishedSets(S.e)}:{})}}
 async function pub(){if(user&&ref)await setDoc(doc(db,"leaderboard",user.uid),leaderboardData())}
 let lbS="xp",lbD=[];const esc=t=>String(t).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";"),num=v=>Number(v)||0;
-async function lbView(){const account=user;$("#list").innerHTML=`<div class="last" style="text-align:center">Laden…</div>`;
- try{const sn=await getDocs(collection(db,"leaderboard"));if(account!==user||tab!=="l")return;lbD=sn.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.on===true)}catch(e){if(account===user&&tab==="l")$("#list").innerHTML=`<div class="card"><div class="nm">Leaderboard kon niet laden</div><div class="row"><button data-t="l">Opnieuw proberen</button></div></div>`;return}
- lbDraw()}
+let stopLeaderboard=()=>{};
+function lbView(){
+ const account=user;
+ stopLeaderboard();
+ $("#list").textContent="Laden…";
+ stopLeaderboard=onSnapshot(query(collection(db,"leaderboard"),where("on","==",true)),sn=>{
+   if(account!==user||tab!=="l")return;
+   lbD=sn.docs.map(d=>({...d.data(),id:d.id}));lbDraw();
+ },()=>{
+   if(account!==user||tab!=="l")return;
+   lbD=[];$("#list").innerHTML='<div class="card">Leaderboard kon niet laden.<div class="row"><button data-t="l">Opnieuw proberen</button></div></div>';
+ });
+}
+let gekozenOefening="";
+document.addEventListener("change",event=>{
+ if(event.target.id!=="lb-exercise")return;
+ gekozenOefening=event.target.value;
+ lbDraw();
+ document.getElementById("lb-exercise")?.focus();
+});
+function sharedSection(rows){
+ const rankings=new Map();
+ const best=[], recent=[];
+ const usable=set=>set&&Number.isFinite(set.kg)&&set.kg>0&&Number.isFinite(set.r)&&/^\d{4}-\d\d-\d\d$/.test(set.d);
+ for(const person of rows){
+   if(person.on!==true||!Array.isArray(person.sharedSets))continue;
+   let heaviest=null;
+   for(const exercise of person.sharedSets){
+     if(!exercise||typeof exercise.x!=="string")continue;
+     const describe=set=>({...set,x:exercise.x,n:person.n||"Anoniem"});
+     if(usable(exercise.best)){
+       if(!rankings.has(exercise.x))rankings.set(exercise.x,new Map());
+       const perPerson=rankings.get(exercise.x);
+       if(better(exercise.best,perPerson.get(person.id)))perPerson.set(person.id,describe(exercise.best));
+     }
+     if(usable(exercise.best)&&better(exercise.best,heaviest))heaviest=describe(exercise.best);
+     for(const set of Array.isArray(exercise.latest)?exercise.latest:[]){
+       if(usable(set))recent.push(describe(set));
+     }
+   }
+   if(heaviest)best.push(heaviest);
+ }
+ best.sort((a,b)=>b.kg-a.kg||b.r-a.r);
+ let place=0;
+ const overall=best.length?'<section class="card"><h3 class="nm">Zwaarste sets · alle oefeningen</h3><ol class="rank-list">'+best.map((s,i)=>{
+   if(!i||s.kg!==best[i-1].kg||s.r!==best[i-1].r)place=i+1;
+   return '<li class="rank"><span class="rank-number">'+place+'</span><div><strong>'+esc(String(s.n))+'</strong><div class="last">'+esc(s.x)+' · '+s.d.split("-").reverse().join("-")+'</div></div><b>'+s.kg.toLocaleString("nl-NL")+' kg × '+s.r+'</b></li>';
+ }).join("")+'</ol></section>':'';
+ recent.sort((a,b)=>b.d.localeCompare(a.d));
+ const card=(title,sets)=>'<section class="card"><h3 class="nm">'+title+'</h3>'+sets.map(s=>
+   '<div class="hist"><div><b>'+esc(String(s.n))+'</b><span>'+esc(s.x)+'</span><strong>'+
+   s.kg.toLocaleString("nl-NL")+' kg × '+s.r+'</strong></div><small>'+s.d.split("-").reverse().join("-")+'</small></div>').join("")+'</section>';
+ const names=[...rankings.keys()].sort((a,b)=>a.localeCompare(b,"nl"));
+ const selected=rankings.has(gekozenOefening)?gekozenOefening:names[0];
+ const scores=[...(rankings.get(selected)?.values()||[])].sort((a,b)=>b.kg-a.kg||b.r-a.r);
+ const byExercise=scores.length?'<section class="card"><h3>Ranglijst per oefening</h3><label>Oefening <select id="lb-exercise">'+names.map(x=>'<option'+(x===selected?' selected':'')+'>'+esc(x)+'</option>').join("")+'</select></label><ol>'+scores.map(s=>'<li><strong>'+esc(String(s.n))+'</strong> · '+s.kg.toLocaleString("nl-NL")+' kg × '+s.r+'</li>').join("")+'</ol></section>':'';
+ return '<section><h2>Gedeelde sets</h2>'+overall+byExercise+(best.length||recent.length?
+   card("Nieuwste sets",recent.slice(0,5)):
+   '<p class="last">Er zijn nog geen sets gedeeld.</p>')+'</section>';
+}
+
 function lbDraw(){if(tab!="l")return;const o={xp:"XP",pr:"PR's",days:"Dagen",ws:"Weken op rij"},rows=lbD.slice().sort((a,b)=>num(b[lbS])-num(a[lbS])||num(b.xp)-num(a.xp));
  $("#list").innerHTML=`<div class="row" style="margin-top:0">${Object.keys(o).map(k=>`<button data-ls="${k}" class="${k==lbS?"p":""}">${o[k]}</button>`).join("")}</div>`+
  (rows.length?`<ol class="rank-list">`+rows.map((r,i)=>`<li class="card rank ${r.id===user.uid?"rank-you":""}"><span class="rank-number">${String(i+1).padStart(2,"0")}</span><div><div class="nm">${esc(String(r.n||"Anoniem").slice(0,20))}${r.id===user.uid?` <small class="rank-self">Jij</small>`:""}</div><div class="last">Level ${num(r.l)} · ${num(r.xp)} XP · ${num(r.pr)} PR’s · ${num(r.days)} dagen</div></div><div class="rank-score"><strong>${nf(num(r[lbS]))}</strong><span>${o[lbS]}</span></div></li>`).join("")+`</ol>`:`<div class="card"><div class="last">Nog niemand op het leaderboard.</div></div>`)+
- `<div class="last" style="text-align:center;margin:12px 0">Iedereen met een account ziet je naam en stats hier.</div><div class="row">${S.lb!==false?`<button data-sharesets="1">${S.shareSets?"Stop delen van gewichten":"Deel mijn zwaarste en nieuwste sets met deelnemers"}</button>`:""}<button data-lbt="1">${S.lb===false?"Doe weer mee aan leaderboard":"Verberg mij uit leaderboard"}</button></div>`}
+ sharedSection(lbD)+`<div class="last" style="text-align:center;margin:12px 0">Iedereen met een account ziet je naam en stats hier.</div><div class="row">${S.lb!==false?`<button data-sharesets="1">${S.shareSets?"Stop delen van gewichten":"Deel mijn zwaarste en nieuwste sets met deelnemers"}</button>`:""}<button data-lbt="1">${S.lb===false?"Doe weer mee aan leaderboard":"Verberg mij uit leaderboard"}</button></div>`}
 let ordering=false;
 const D=()=>S.days||DAYS;
 function mig(){if(S.days)return false;S.days=DAYS.map((d,i)=>{const h=S.h||[],o=(S.o||{})[i]||[],b=d.ex.filter(n=>!h.includes(n)).concat((S.c||[]).filter(c=>c.d==i).map(c=>c.n)),p=a=>o.indexOf(a)<0?999+b.indexOf(a):o.indexOf(a);return{t:d.t,ex:b.slice().sort((x,y)=>p(x)-p(y))}});return true}
@@ -292,6 +350,7 @@ function dayTools(){
  <details class="card add-card"><summary>Eigen oefening toevoegen</summary><form id="addx"><label class="w">Naam<input name="n" placeholder="Bijv. Cable Curl" required maxlength="40"></label><label>Meten in<select name="t"><option value="kg">Gewicht × reps</option><option value="t">Tijd</option></select></label><label>Spiergroep<select name="g">${GR.map(g=>`<option${g=="Overig"?" selected":""}>${g}</option>`).join("")}</select></label><button>Oefening toevoegen</button></form></details>`;
 }
 function render(){
+ if(tab!=="l"||!user)stopLeaderboard();
  const focus=document.activeElement;
  const picker=$("#list .day-picker");
  const dayScroll=picker?.scrollLeft||0;
