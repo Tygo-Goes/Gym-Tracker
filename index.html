@@ -24,7 +24,7 @@
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,doc,getDoc,setDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getFirestore,writeBatch,doc,getDoc,setDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {firebaseConfig} from "./firebase-config.js";
 import {strengthView, muscles, exerciseMuscles, stepDate} from "./strength.js";
 import {showWorkoutSummary} from "./workout.js";
@@ -87,7 +87,7 @@ onAuthStateChanged(auth,async u=>{
    ref=r;pick=sn.exists()?0:1;
    if(sn.exists()){
     const d=sn.data();
-    S={e:d.e||[],n:d.n||"",c:d.c||[],o:d.o||{},h:d.h||[],bw:d.bw||0,ss:d.ss||[],pn:d.pn||{},lb:d.lb!==false,days:(d.dy||[]).length?d.dy:undefined,bwh:d.bwh||[],xb:Number(d.xb)||0};
+    S={e:d.e||[],n:d.n||"",c:d.c||[],o:d.o||{},h:d.h||[],bw:d.bw||0,ss:d.ss||[],pn:d.pn||{},lb:d.lb!==false,shareSets:d.shareSets===true,days:(d.dy||[]).length?d.dy:undefined,bwh:d.bwh||[],xb:Number(d.xb)||0};
    }
   }catch(e){
    if(user!==u)return;
@@ -227,7 +227,23 @@ function finish(){const st=+localStorage.getItem(timerKey());if(!st)return;const
    localStorage.removeItem(timerKey());save();el.close();render();toast("Training opgeslagen ✓");
    showWorkoutSummary(session,entries)}
   else{r[v.slice(0,2)]=+v.slice(2);draw();el.querySelector(`[data-sc="${v}"]`).focus()}}}
-async function pub(){if(!user||!ref)return;const x=xpOf();await setDoc(doc(db,"leaderboard",user.uid),S.lb===false?{on:false}:{on:true,n:S.n||"Anoniem",xp:x,l:lvOf(x),pr:prAll().length,sets:S.e.filter(e=>!e.rm).length,days:new Set(S.e.filter(e=>e.d).map(e=>e.d)).size,ws:wkStreak(),t:Date.now()})}
+function publishedSets(entries){
+ const grouped=new Map();
+ for(const [i,e] of entries.entries()){
+   if(!e || !e.x || !e.d || !(Number(e.kg)>0) || !Number.isFinite(Number(e.kg)))continue;
+   const x=K(e.x), row={kg:Number(e.kg),r:e.rm?1:Number(e.r)||0,d:e.d,i};
+   if(!grouped.has(x))grouped.set(x,[]);
+   grouped.get(x).push(row);
+ }
+ return Array.from(grouped,([x,list])=>{
+   list.sort((a,b)=>b.d.localeCompare(a.d)||b.i-a.i);
+   const best=list.reduce((a,b)=>better(b,a)?b:a);
+   const clean=({kg,r,d})=>({kg,r,d});
+   return {x,best:clean(best),latest:list.slice(0,5).map(clean)};
+ });
+}
+function leaderboardData(){const x=xpOf();return S.lb===false?{on:false}:{on:true,n:S.n||"Anoniem",xp:x,l:lvOf(x),pr:prAll().length,sets:S.e.filter(e=>!e.rm).length,days:new Set(S.e.filter(e=>e.d).map(e=>e.d)).size,ws:wkStreak(),t:Date.now(),...(S.shareSets?{sharedSets:publishedSets(S.e)}:{})}}
+async function pub(){if(user&&ref)await setDoc(doc(db,"leaderboard",user.uid),leaderboardData())}
 let lbS="xp",lbD=[];const esc=t=>String(t).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";"),num=v=>Number(v)||0;
 async function lbView(){const account=user;$("#list").innerHTML=`<div class="last" style="text-align:center">Laden…</div>`;
  try{const sn=await getDocs(collection(db,"leaderboard"));if(account!==user||tab!=="l")return;lbD=sn.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.on===true)}catch(e){if(account===user&&tab==="l")$("#list").innerHTML=`<div class="card"><div class="nm">Leaderboard kon niet laden</div><div class="row"><button data-t="l">Opnieuw proberen</button></div></div>`;return}
@@ -235,7 +251,7 @@ async function lbView(){const account=user;$("#list").innerHTML=`<div class="las
 function lbDraw(){if(tab!="l")return;const o={xp:"XP",pr:"PR's",days:"Dagen",ws:"Weken op rij"},rows=lbD.slice().sort((a,b)=>num(b[lbS])-num(a[lbS])||num(b.xp)-num(a.xp));
  $("#list").innerHTML=`<div class="row" style="margin-top:0">${Object.keys(o).map(k=>`<button data-ls="${k}" class="${k==lbS?"p":""}">${o[k]}</button>`).join("")}</div>`+
  (rows.length?`<ol class="rank-list">`+rows.map((r,i)=>`<li class="card rank ${r.id===user.uid?"rank-you":""}"><span class="rank-number">${String(i+1).padStart(2,"0")}</span><div><div class="nm">${esc(String(r.n||"Anoniem").slice(0,20))}${r.id===user.uid?` <small class="rank-self">Jij</small>`:""}</div><div class="last">Level ${num(r.l)} · ${num(r.xp)} XP · ${num(r.pr)} PR’s · ${num(r.days)} dagen</div></div><div class="rank-score"><strong>${nf(num(r[lbS]))}</strong><span>${o[lbS]}</span></div></li>`).join("")+`</ol>`:`<div class="card"><div class="last">Nog niemand op het leaderboard.</div></div>`)+
- `<div class="last" style="text-align:center;margin:12px 0">Iedereen met een account ziet je naam en stats hier.</div><div class="row"><button data-lbt="1">${S.lb===false?"Doe weer mee aan leaderboard":"Verberg mij uit leaderboard"}</button></div>`}
+ `<div class="last" style="text-align:center;margin:12px 0">Iedereen met een account ziet je naam en stats hier.</div><div class="row">${S.lb!==false?`<button data-sharesets="1">${S.shareSets?"Stop delen van gewichten":"Deel mijn zwaarste en nieuwste sets met deelnemers"}</button>`:""}<button data-lbt="1">${S.lb===false?"Doe weer mee aan leaderboard":"Verberg mij uit leaderboard"}</button></div>`}
 let ordering=false;
 const D=()=>S.days||DAYS;
 function mig(){if(S.days)return false;S.days=DAYS.map((d,i)=>{const h=S.h||[],o=(S.o||{})[i]||[],b=d.ex.filter(n=>!h.includes(n)).concat((S.c||[]).filter(c=>c.d==i).map(c=>c.n)),p=a=>o.indexOf(a)<0?999+b.indexOf(a):o.indexOf(a);return{t:d.t,ex:b.slice().sort((x,y)=>p(x)-p(y))}});return true}
@@ -317,7 +333,7 @@ function render(){
   current?.focus({preventScroll:true});
  }
 }
-document.addEventListener("click",ev=>{const t=ev.target.closest("button,a,[data-wp],[data-wy],.muscle-region");if(!t||t.closest("#wr,#sc,#workout-summary"))return;const wp=t.closest("[data-wp]");if(wp){story(+wp.dataset.wp);return}const wb=t.closest("[data-wy]");if(wb){wy=+wb.dataset.wy;render();return}
+document.addEventListener("click",async ev=>{const t=ev.target.closest("button,a,[data-wp],[data-wy],.muscle-region");if(!t||t.closest("#wr,#sc,#workout-summary"))return;const wp=t.closest("[data-wp]");if(wp){story(+wp.dataset.wp);return}const wb=t.closest("[data-wy]");if(wb){wy=+wb.dataset.wy;render();return}
  if(t.id=="lo"||t.dataset.exit){ev.preventDefault();signOut(auth).catch(()=>toast("Uitloggen mislukt"))}
  else if(t.dataset.retry){location.reload()}
  else if(t.dataset.strengthDate){
@@ -365,6 +381,13 @@ document.addEventListener("click",ev=>{const t=ev.target.closest("button,a,[data
  else if(t.dataset.rn){const v=prompt("Naam van deze dag",D()[tab].t);const c=v&&v.replace(/["<>&\\]/g,"").trim().slice(0,20);if(c){D()[tab].t=c;save();render()}}
  else if(t.dataset.dd){if(D().length<2)toast("Je hebt minimaal 1 dag nodig");else if(confirm("Deze dag verwijderen? Je sets blijven bewaard.")){S.days.splice(tab,1);tab=0;lastDay=0;save();render()}}
  else if(t.dataset.ls){lbS=t.dataset.ls;lbDraw()}
+ else if(t.dataset.sharesets){
+   const account=user, state=S, previous=S.shareSets===true;t.disabled=true;S.shareSets=!previous;
+   try{const b=writeBatch(db);b.set(ref,{shareSets:S.shareSets},{merge:true});
+     b.set(doc(db,"leaderboard",user.uid),leaderboardData());await b.commit();
+   }catch{state.shareSets=previous;toast("Delen wijzigen mislukt. Probeer opnieuw.");}
+   if(user===account&&tab==="l")render();
+ }
  else if(t.dataset.lbt){t.disabled=true;const account=user;S.lb=S.lb===false;save(true).then(()=>{if(user===account&&tab==="l")render()})}
  else if(t.dataset.ts){localStorage.setItem(timerKey(),Date.now());tmDraw();toast("Training gestart ⏱")}
  else if(t.dataset.te){finish()}
