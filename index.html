@@ -281,7 +281,8 @@ function sharedSection(rows){
        if(better(exercise.best,perPerson.get(person.id)))perPerson.set(person.id,describe(exercise.best));
      }
      const muscle=GM[exercise.x]||exercise.group;
-     if(GR.includes(muscle)&&muscle!=="Benen"&&usable(exercise.best)&&better(exercise.best,heaviest))heaviest=describe(exercise.best);
+     const eligible=GR.includes(muscle)&&muscle!=="Benen"&&exercise.x.trim().toLowerCase()!=="back extension";
+     if(eligible&&usable(exercise.best)&&better(exercise.best,heaviest))heaviest=describe(exercise.best);
      for(const set of Array.isArray(exercise.latest)?exercise.latest:[]){
        if(usable(set))recent.push(describe(set));
      }
@@ -290,10 +291,10 @@ function sharedSection(rows){
  }
  best.sort((a,b)=>b.kg-a.kg||b.r-a.r);
  let place=0;
- const overall=best.length?'<section class="card"><h3 class="nm">Zwaarste sets · zonder benen</h3><ol class="rank-list">'+best.map((s,i)=>{
+ const overall=best.length?'<section class="card"><h3 class="nm">Zwaarste set per persoon</h3><ol class="rank-list">'+best.map((s,i)=>{
    if(!i||s.kg!==best[i-1].kg||s.r!==best[i-1].r)place=i+1;
    return '<li class="rank"><span class="rank-number">'+place+'</span><div><strong>'+esc(String(s.n))+'</strong><div class="last">'+esc(s.x)+' · '+s.d.split("-").reverse().join("-")+'</div></div><b>'+s.kg.toLocaleString("nl-NL")+' kg × '+s.r+'</b></li>';
- }).join("")+'</ol></section>':'';
+ }).join("")+'</ol></section>':'<p class="last">Nog geen gedeelde sets die meetellen voor deze ranglijst.</p>';
  recent.sort((a,b)=>b.d.localeCompare(a.d));
  const card=(title,sets)=>'<section class="card"><h3 class="nm">'+title+'</h3>'+sets.map(s=>
    '<div class="hist"><div><b>'+esc(String(s.n))+'</b><span>'+esc(s.x)+'</span><strong>'+
@@ -302,15 +303,15 @@ function sharedSection(rows){
  const selected=rankings.has(gekozenOefening)?gekozenOefening:names[0];
  const scores=[...(rankings.get(selected)?.values()||[])].sort((a,b)=>b.kg-a.kg||b.r-a.r);
  const byExercise=scores.length?'<section class="card"><h3>Ranglijst per oefening</h3><label>Oefening <select id="lb-exercise">'+names.map(x=>'<option'+(x===selected?' selected':'')+'>'+esc(x)+'</option>').join("")+'</select></label><ol>'+scores.map(s=>'<li><strong>'+esc(String(s.n))+'</strong> · '+s.kg.toLocaleString("nl-NL")+' kg × '+s.r+'</li>').join("")+'</ol></section>':'';
- return '<section><h2>Gedeelde sets</h2>'+overall+byExercise+(best.length||recent.length?
+ return '<section><p class="last">Beenoefeningen en Back Extension tellen niet mee voor de algemene ranglijst.</p>'+overall+byExercise+(best.length||recent.length?
    card("Nieuwste sets",recent.slice(0,5)):
    '<p class="last">Er zijn nog geen sets gedeeld.</p>')+'</section>';
 }
 
-function lbDraw(){if(tab!="l")return;const o={xp:"XP",pr:"PR's",days:"Dagen",ws:"Weken op rij"},rows=lbD.slice().sort((a,b)=>num(b[lbS])-num(a[lbS])||num(b.xp)-num(a.xp));
+function lbDraw(){if(tab!="l")return;const o={xp:"XP",pr:"PR's",days:"Dagen",ws:"Weken op rij",heavy:"Zwaarste set"},rows=lbD.slice().sort((a,b)=>num(b[lbS])-num(a[lbS])||num(b.xp)-num(a.xp));
  $("#list").innerHTML=`<div class="row" style="margin-top:0">${Object.keys(o).map(k=>`<button data-ls="${k}" class="${k==lbS?"p":""}">${o[k]}</button>`).join("")}</div>`+
- (rows.length?`<ol class="rank-list">`+rows.map((r,i)=>`<li class="card rank ${r.id===user.uid?"rank-you":""}"><span class="rank-number">${String(i+1).padStart(2,"0")}</span><div><div class="nm">${esc(String(r.n||"Anoniem").slice(0,20))}${r.id===user.uid?` <small class="rank-self">Jij</small>`:""}</div><div class="last">Level ${num(r.l)} · ${num(r.xp)} XP · ${num(r.pr)} PR’s · ${num(r.days)} dagen</div></div><div class="rank-score"><strong>${nf(num(r[lbS]))}</strong><span>${o[lbS]}</span></div></li>`).join("")+`</ol>`:`<div class="card"><div class="last">Nog niemand op het leaderboard.</div></div>`)+
- sharedSection(lbD)+`<div class="last" style="text-align:center;margin:12px 0">Iedereen met een account ziet je naam en stats hier.</div><div class="row">${S.lb!==false?`<button data-sharesets="1">${S.shareSets?"Stop delen van gewichten":"Deel mijn zwaarste en nieuwste sets met deelnemers"}</button>`:""}<button data-lbt="1">${S.lb===false?"Doe weer mee aan leaderboard":"Verberg mij uit leaderboard"}</button></div>`}
+ (lbS==="heavy"?sharedSection(lbD):rows.length?`<ol class="rank-list">`+rows.map((r,i)=>`<li class="card rank ${r.id===user.uid?"rank-you":""}"><span class="rank-number">${String(i+1).padStart(2,"0")}</span><div><div class="nm">${esc(String(r.n||"Anoniem").slice(0,20))}${r.id===user.uid?` <small class="rank-self">Jij</small>`:""}</div><div class="last">Level ${num(r.l)} · ${num(r.xp)} XP · ${num(r.pr)} PR’s · ${num(r.days)} dagen</div></div><div class="rank-score"><strong>${nf(num(r[lbS]))}</strong><span>${o[lbS]}</span></div></li>`).join("")+`</ol>`:`<div class="card"><div class="last">Nog niemand op het leaderboard.</div></div>`)+
+ `<div class="last" style="text-align:center;margin:12px 0">Iedereen met een account ziet je naam en stats hier.</div><div class="row">${S.lb!==false?`<button data-sharesets="1">${S.shareSets?"Stop delen van gewichten":"Deel mijn zwaarste en nieuwste sets met deelnemers"}</button>`:""}<button data-lbt="1">${S.lb===false?"Doe weer mee aan leaderboard":"Verberg mij uit leaderboard"}</button></div>`}
 let ordering=false;
 const D=()=>S.days||DAYS;
 function mig(){if(S.days)return false;S.days=DAYS.map((d,i)=>{const h=S.h||[],o=(S.o||{})[i]||[],b=d.ex.filter(n=>!h.includes(n)).concat((S.c||[]).filter(c=>c.d==i).map(c=>c.n)),p=a=>o.indexOf(a)<0?999+b.indexOf(a):o.indexOf(a);return{t:d.t,ex:b.slice().sort((x,y)=>p(x)-p(y))}});return true}
